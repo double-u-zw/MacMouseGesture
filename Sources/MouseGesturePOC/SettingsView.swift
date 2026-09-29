@@ -209,8 +209,8 @@ struct DiagnosticsView: View {
 struct AboutView: View {
     var body: some View {
         VStack(spacing: 12) {
-            Image(systemName: "computermouse")
-                .font(.system(size: 43, weight: .light))
+            Image(nsImage: NSImage(named: NSImage.applicationIconName) ?? NSImage())
+                .resizable().frame(width: 80, height: 80)
                 .accessibilityHidden(true)
             Text("MacMouseGesture").font(.title2.weight(.semibold))
             Text("版本 \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.1.6") · Build \(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "12")")
