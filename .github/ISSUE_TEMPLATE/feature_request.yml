@@ -1,0 +1,11 @@
+name: 建议
+description: 提出使用场景；不代表承诺实现
+title: "[Suggestion] "
+body:
+  - type: textarea
+    id: scenario
+    attributes:
+      label: 想解决的具体问题
+      description: 当前产品聚焦侧键与四方向手势，建议不保证进入计划。
+    validations:
+      required: true

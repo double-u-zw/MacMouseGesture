@@ -1,0 +1,51 @@
+name: 问题报告
+description: 报告 Early Beta 的可复现问题
+title: "[Bug] "
+body:
+  - type: markdown
+    attributes:
+      value: "提交诊断前请展开预览并检查内容。不要上传私人路径、序列号、密码或原始敏感日志；安全问题见 SECURITY.md。"
+  - type: textarea
+    id: problem
+    attributes:
+      label: 问题描述
+      description: 预期行为与实际行为
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: App 版本与 Build
+    validations:
+      required: true
+  - type: input
+    id: macos
+    attributes:
+      label: macOS 版本
+    validations:
+      required: true
+  - type: input
+    id: hardware
+    attributes:
+      label: Mac 型号 / 芯片
+      description: 只填型号，不填序列号
+  - type: input
+    id: mouse
+    attributes:
+      label: 鼠标型号
+  - type: input
+    id: displays
+    attributes:
+      label: 显示器情况
+      description: 是否多显示器、是否全屏
+  - type: textarea
+    id: steps
+    attributes:
+      label: 复现步骤
+    validations:
+      required: true
+  - type: textarea
+    id: diagnostics
+    attributes:
+      label: 已检查的脱敏诊断信息
+      render: text

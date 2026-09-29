@@ -1,20 +1,22 @@
-# Research provenance and licenses
+# Third-party notices — review pending
 
-This personal experimental project was developed after studying Mac Mouse Fix by Noah Nuebling, in particular its research into macOS 27 Dock Swipe events. The private event protocol used here is informed by that research. Attribution does not imply endorsement.
+**License status is under review.** This is a local Beta Preview, not a grant of redistribution rights or a final licensing determination. No project-wide license has been selected.
 
-- Upstream: https://github.com/noah-nuebling/mac-mouse-fix
-- Research snapshot: `a7ac3ecc86acf4ddb309ce1007472439a2f9d42a`
-- Key investigation: https://github.com/noah-nuebling/mac-mouse-fix/commit/f92d2d53a
-- Upstream license: https://github.com/noah-nuebling/mac-mouse-fix/blob/master/License
+## Mac Mouse Fix
 
-Mac Mouse Fix uses the custom **MMF License**, not the MIT License. Its terms include attribution and restrictions on publishing executables derived from its source. The reference checkout retains that license unchanged. This deliverable is a local personal-use POC, not a public distribution or an assertion of unrestricted redistribution rights. Re-evaluate those terms before publishing a derivative binary.
+- Author: Noah Nuebling.
+- Repository: https://github.com/noah-nuebling/mac-mouse-fix
+- Research snapshot: `a7ac3ecc86acf4ddb309ce1007472439a2f9d42a`.
+- Reviewed license: [custom MMF License](https://github.com/noah-nuebling/mac-mouse-fix/blob/0c0fc99e65b3b09e083cbedc71c4d83fe21d1075/License), not MIT, Apache or GPL.
 
-No upstream source files, UI, configuration, monetization components, dependencies, pointer-offset hacks, or build targets are copied into or linked into this application. The implementation is new Swift and Objective-C code. The event protocol, symbol names, and minimal ABI declarations are documented in `docs/research.md`.
+SystemGestureBridge's DockSwipe event construction, phase encoding, progress/flavor/motion fields, terminal velocity child and event attachment were informed by and conservatively classified as adapted from MMF research/implementation. Input coalescing and gesture semantics also drew conceptual inspiration. Renaming or rewriting in another wrapper is not proof of independent origin. No claim is made that all code is wholly independently original.
 
-Apple's published IOHIDFamily / IOKitUser interfaces were used to identify event types, field encodings, phases, and the HIDEvent Objective-C interface:
+The copied-expression/derivative scope and source/binary publication conditions still require confirmation. Attribution does not imply endorsement or permission. See [the per-file audit](docs/third-party-audit.md). Do not publish the repository or binary on the assumption that a free Beta is exempt.
 
-- https://github.com/apple-oss-distributions/IOHIDFamily/blob/IOHIDFamily-1633.120.12/IOHIDFamily/IOHIDEventTypes.h
-- https://github.com/apple-oss-distributions/IOHIDFamily/blob/IOHIDFamily-1633.120.12/IOHIDFamily/IOHIDEventFieldDefs.h
-- https://github.com/apple-oss-distributions/IOHIDFamily/blob/IOHIDFamily-1633.120.12/HID/HIDEvent.h
+## Apple open-source interfaces
 
-No Apple implementation source is bundled. The minimal declarations and numeric protocol constants are confined to `SystemGestureBridge.m`.
+Minimal ABI declarations and numeric event protocol constants were informed by [IOHIDFamily](https://github.com/apple-oss-distributions/IOHIDFamily/tree/IOHIDFamily-1633.120.12), including IOHIDEventTypes.h, IOHIDEventFieldDefs.h and HIDEvent.h. The audit identified APSL notices on relevant headers, while the precise covered scope of minimal declarations remains under review. No complete Apple implementation source is bundled. This is not a final APSL compliance conclusion.
+
+## App icon
+
+The project icon was newly generated with the built-in image generation tool from a user-supplied visual direction, then packaged at macOS icon sizes. It depicts a generic mouse, not a branded product photograph. Source, prompt and generation notes are in `design/README.md`. This provenance note does not assign a project-wide license.

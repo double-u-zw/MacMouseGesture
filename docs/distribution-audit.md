@@ -33,7 +33,7 @@
 
 首次沙箱内 codesign 曾显示 `CSSMERR_TP_NOT_TRUSTED`、Authority unavailable、Info.plist/entitlements 异常提示；正常用户上下文复核显示有效、Info.plist entries=11、空 entitlement。**这是本次检查上下文差异，不能据此宣称稳定签名损坏。**证书仅导出公开 DER 到忽略目录，未导出私钥，也未更改信任设置。
 
-当前稳定 CDHash：`37a9788dbf5c1b532ebf33379ef2e4c4486e4351`。本轮实验前后可执行文件 SHA-256 完全相同；Sources、Resources、原 scripts 的 Git diff 为零。
+当前稳定 CDHash：（仅保留在本地审计证据中）。本轮实验前后可执行文件 SHA-256 完全相同；Sources、Resources、原 scripts 的 Git diff 为零。
 
 ## 官方站外发布流程（以后实施）
 
@@ -105,3 +105,7 @@ Accessibility / Input Monitoring 授权由用户在系统设置管理；不修�
 未来需：嵌入/签名 framework 与 helper，建立 updater 生命周期；配置 HTTPS appcast、`SUFeedURL`、递增 `CFBundleVersion`；保管独立 EdDSA/ed25519 私钥并在 app 放 `SUPublicEDKey`；签更新归档，生成 appcast，验收断网/损坏签名/回滚/跨版本更新。Developer ID 代码签名、公证与 Sparkle 更新签名解决不同问题，不能互相替代。
 
 P1：先稳定产品身份与发行签名再接更新；P2：渠道、回滚运营、发布说明与自动更新体验。若未来启用联网检查，应说明更新时间/IP 等网络元数据；保持默认无遥测并另审查 Sparkle 及第三方组件许可证。本轮没有生成 EdDSA 密钥、appcast 或联网更新逻辑。
+
+## 公开文档整理
+
+Beta 产品化阶段已将本地证书公开指纹从当前文档脱敏；旧 Phase 0 commit 仍保留原记录，公开历史策略需另行确认。这里的指纹不是私钥，未据此重写稳定 tag。
