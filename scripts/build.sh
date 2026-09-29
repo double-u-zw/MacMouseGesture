@@ -22,6 +22,7 @@ staged_bundle="$stage/MacMouseGesture.app"
 mkdir -p "$staged_bundle/Contents/MacOS" "$staged_bundle/Contents/Resources"
 cp build/MacMouseGesture "$staged_bundle/Contents/MacOS/MacMouseGesture"
 cp Resources/Info.plist "$staged_bundle/Contents/Info.plist"
+cp Resources/MacMouseGesture.icns "$staged_bundle/Contents/Resources/"
 cp THIRD_PARTY_NOTICES.md "$staged_bundle/Contents/Resources/"
 sign_bundle "$staged_bundle"
 # Keep the previously installed bundle recoverable, even if a later build fails.
