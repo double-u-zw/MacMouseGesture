@@ -1,0 +1,46 @@
+PASS button mapping
+PASS dead zone
+PASS vertical axis lock
+PASS horizontal axis lock + reverse
+PASS 8000 Hz → 120 Hz, all deltas retained
+PASS release flush
+PASS stationary hold + stale velocity
+PASS flick vs slow release
+PASS progress completion
+PASS cancel + restart
+PASS 100 simulated sessions
+PASS invert + invalid input
+PASS private HID round-trip; NO event injection
+PASS 8000 input reports + ordered button boundaries
+PASS unrelated inputs + stopped hook pass through
+PASS observe mode + overflow fail open
+PASS Escape + optional pointer freeze
+PASS invalid input timestamps cannot expire a gesture
+PASS event age rejects missing/stale/future timestamps
+PASS either side button + confirmed direction
+PASS overlapping buttons + both release orders
+PASS duplicate/unmatched edges + alternating buttons
+PASS dual-button Escape/tap cancellation fails open
+PASS dual-button observation remains passive
+PASS permission grant starts once without retry loops
+PASS manual stop overrides pending automatic start
+PASS resume waits for all suspensions and permission
+PASS stopped/observation mode stays stopped on wake
+PASS first launch retains Build 4 settings
+PASS all config fields + disabled intent round trip
+PASS corrupt defaults, NaN, infinity and type protection
+PASS config limits and side-button input validation
+PASS config persists across separate processes
+PASS slow drag, 7+2px dead zone and pause/resume
+PASS halfway two-second pause keeps one sequence
+PASS reverse 100/80 and small jitter
+PASS 100 alternating buttons + release jitter + balanced counters
+PASS tap interrupt cancels once, fails open, requires release
+PASS bounded recovery + display resume respects stop/sleep
+PASS counters expose orphan and invalid sequences
+PASS menu status maps real engine and permission state
+PASS side-button settings cannot remove the last button
+PASS sensitivity slider preserves the confirmed default
+PASS settings bindings save through the existing config store
+PASS login item approval is distinct from off
+45 checks, 0 failures. No real mouse/Spaces acceptance implied.

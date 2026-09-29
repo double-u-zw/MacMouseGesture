@@ -1,0 +1,4 @@
+module SystemGestureBridge {
+    header "SystemGestureBridge.h"
+    export *
+}

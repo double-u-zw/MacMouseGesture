@@ -1,0 +1,32 @@
+# macOS and local build state
+.DS_Store
+.build/
+build/
+DerivedData/
+xcuserdata/
+*.xcuserstate
+*.log
+
+# Local signing and credential material
+.local-signing/
+*.p12
+*.pfx
+*.pem
+*.key
+*.keychain
+*.keychain-db
+*.mobileprovision
+.env
+.env.*
+
+# Third-party research checkouts are local references, not project source.
+references/
+
+# Keep only small, reviewed baseline manifests and test summaries in Git.
+baselines/**/*
+!baselines/**/
+!baselines/README.md
+!baselines/**/README.md
+!baselines/**/SHA256SUMS
+!baselines/**/test-output.txt
+!baselines/**/tests-rechecked.txt

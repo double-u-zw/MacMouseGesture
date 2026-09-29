@@ -1,0 +1,32 @@
+<unknown>:0: warning: legacy driver is now deprecated; consider avoiding specifying 'SWIFT_USE_OLD_DRIVER'
+<unknown>:0: warning: legacy driver is now deprecated; consider avoiding specifying 'SWIFT_USE_OLD_DRIVER'
+<unknown>:0: warning: legacy driver is now deprecated; consider avoiding specifying 'SWIFT_USE_OLD_DRIVER'
+PASS button mapping
+PASS dead zone
+PASS vertical axis lock
+PASS horizontal axis lock + reverse
+PASS 8000 Hz → 120 Hz, all deltas retained
+PASS release flush
+PASS stationary hold + stale velocity
+PASS flick vs slow release
+PASS progress completion
+PASS cancel + restart
+PASS 100 simulated sessions
+PASS invert + invalid input
+PASS private HID round-trip; NO event injection
+PASS 8000 input reports + ordered button boundaries
+PASS unrelated inputs + stopped hook pass through
+PASS observe mode + overflow fail open
+PASS Escape + optional pointer freeze
+PASS invalid input timestamps cannot expire a gesture
+PASS event age rejects missing/stale/future timestamps
+PASS either side button + confirmed direction
+PASS overlapping buttons + both release orders
+PASS duplicate/unmatched edges + alternating buttons
+PASS dual-button Escape/tap cancellation fails open
+PASS dual-button observation remains passive
+PASS permission grant starts once without retry loops
+PASS manual stop overrides pending automatic start
+PASS resume waits for all suspensions and permission
+PASS stopped/observation mode stays stopped on wake
+28 checks, 0 failures. No real mouse/Spaces acceptance implied.
