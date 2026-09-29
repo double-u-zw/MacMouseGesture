@@ -33,16 +33,33 @@ final class MacMouseGestureApp: NSObject, NSApplicationDelegate {
     private var settingDebounce: Timer?
     private var observers: [NSObjectProtocol] = []
     private var signalSources: [DispatchSourceSignal] = []
-    private var instanceFD: Int32 = -1
+    private let instance = SingleInstance()
+    private var ownsInstance = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
-        let lockURL = Bundle.main.bundleURL.deletingLastPathComponent().appendingPathComponent("poc.lock")
-        instanceFD = Darwin.open(lockURL.path, O_CREAT | O_RDWR, S_IRUSR | S_IWUSR)
-        guard instanceFD >= 0, flock(instanceFD, LOCK_EX | LOCK_NB) == 0 else {
-            NSLog("MacMouseGesture is already running or its app directory cannot be locked")
+        // Older builds used a directory-local lock. Do not run beside a live legacy copy.
+        let legacy = NSRunningApplication.runningApplications(withBundleIdentifier: "local.macmousegesture.poc")
+            .first { other in
+                guard other.processIdentifier != getpid(), let url = other.bundleURL,
+                      let bundle = Bundle(url: url) else { return false }
+                return (bundle.object(forInfoDictionaryKey: "CFBundleVersion") as? String).flatMap(Int.init).map { $0 < 13 } ?? true
+            }
+        let result = legacy == nil ? instance.acquire() : .alreadyRunning
+        guard result == .acquired else {
+            if result == .alreadyRunning {
+                (legacy ?? NSRunningApplication.runningApplications(withBundleIdentifier: "local.macmousegesture.poc")
+                    .first { $0.processIdentifier != getpid() })?.activate(options: [])
+                NSLog("MacMouseGesture 已在运行；此副本退出。")
+            } else {
+                let alert = NSAlert()
+                alert.messageText = "无法启动 MacMouseGesture"
+                alert.informativeText = "无法访问用户级运行锁。请确认当前用户的资源库可写后重新打开。"
+                alert.runModal()
+            }
             NSApp.terminate(nil)
             return
         }
+        ownsInstance = true
         model.show(store.load())
         if !model.config.shouldRun { automatic.stop() }
         NSApp.setActivationPolicy(.accessory)
@@ -329,8 +346,7 @@ final class MacMouseGestureApp: NSObject, NSApplicationDelegate {
         settingDebounce?.invalidate()
         automatic.stop()
         refresh?.invalidate()
-        engine.shutdown()
-        if instanceFD >= 0 { close(instanceFD) }
+        if ownsInstance { engine.shutdown() }
     }
 }
 
