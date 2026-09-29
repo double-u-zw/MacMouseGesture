@@ -9,7 +9,7 @@ export SWIFT_MODULECACHE_PATH="$PWD/build/module-cache"
 export SWIFT_USE_OLD_DRIVER=1
 swift_flags=(-O -target arm64-apple-macosx27.0 -module-cache-path "$PWD/build/module-cache")
 compile_core() {
-  xcrun clang -g -fdebug-prefix-map="$PWD=." -fobjc-arc -fmodules -fmodules-cache-path="$PWD/build/module-cache" \
+  xcrun clang -g -fobjc-arc -fmodules -fmodules-cache-path="$PWD/build/module-cache" \
     -mmacosx-version-min=27.0 -I Sources/SystemGestureBridge/include \
     -c Sources/SystemGestureBridge/SystemGestureBridge.m -o build/SystemGestureBridge.o
   xcrun swiftc "${swift_flags[@]}" -parse-as-library -emit-module -enable-testing \

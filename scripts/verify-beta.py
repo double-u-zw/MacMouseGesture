@@ -19,6 +19,7 @@ def verify(bundle):
     assert exe.is_file() and exe.stat().st_mode & 0o111, 'missing executable'
     assert (bundle / 'Contents/Resources/THIRD_PARTY_NOTICES.md').is_file(), 'missing notices'
     assert subprocess.check_output(['lipo', '-archs', str(exe)], text=True).strip() == 'arm64'
+    assert b'/Users/' not in exe.read_bytes(), 'local home path in executable'
     linked = subprocess.check_output(['otool', '-L', str(exe)], text=True)
     for line in linked.splitlines()[1:]:
         path = line.strip().split(' (')[0]
