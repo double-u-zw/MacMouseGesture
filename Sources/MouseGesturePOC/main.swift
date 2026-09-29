@@ -9,8 +9,8 @@ if CommandLine.arguments.contains("--probe") {
     let vertical = backend.probeVertical()
     print("macOS: \(ProcessInfo.processInfo.operatingSystemVersionString); arch: arm64")
     print("Accessibility: \(AXIsProcessTrusted()); Input Monitoring: \(CGPreflightListenEventAccess())")
-    print(backend.status)
-    print(vertical.status)
+    print(DiagnosticRedactor.redact(backend.status))
+    print(DiagnosticRedactor.redact(vertical.status))
     print("No events posted. Hardware input and interactive Dock response remain unverified.")
     exit(backend.available && vertical.available ? 0 : 1)
 }
@@ -238,7 +238,7 @@ final class MacMouseGestureApp: NSObject, NSApplicationDelegate {
             try loginItem.setEnabled(enabled)
             model.message = nil
         } catch {
-            model.message = "无法更改登录启动设置：\(error.localizedDescription)"
+            model.message = DiagnosticRedactor.redact("无法更改登录启动设置：\(error.localizedDescription)")
             diagnostics.log("WARN", model.message ?? "Launch at Login failed")
         }
         model.loginState = loginItem.state
@@ -251,17 +251,18 @@ final class MacMouseGestureApp: NSObject, NSApplicationDelegate {
     }
 
     private func report() -> String {
-        "macOS: \(ProcessInfo.processInfo.operatingSystemVersionString)\nArchitecture: arm64\n" +
+        DiagnosticRedactor.redact("macOS: \(ProcessInfo.processInfo.operatingSystemVersionString)\nArchitecture: arm64\n" +
         "Version: \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "unknown")\n" +
         "Build: \(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "unknown")\n" +
-        "Bundle: \(Bundle.main.bundleURL.path)\n" +
+        "Git Commit: \(Bundle.main.object(forInfoDictionaryKey: "GitCommit") as? String ?? "unknown")\n" +
+        "安装位置：\(DiagnosticRedactor.installation())\n" +
         "Accessibility: \(AXIsProcessTrusted())\nInput Monitoring: \(CGPreflightListenEventAccess())\n" +
         "Input: CGEventTap / optional IOHIDManager\nBackend: \(engine.backend.status)\n" +
         "Config: enabled=\(model.config.enabled); horizontalEnabled=\(model.config.horizontalEnabled); verticalEnabled=\(model.config.verticalEnabled); " +
         "buttons=\(model.config.buttonText); invert=\(model.config.horizontalInvert); " +
         "pixels/progress=\(model.config.sensitivity); deadZone=\(model.config.deadZone); " +
         "freeze=\(model.config.freezePointer)\n" +
-        "\(engine.diagnosticsSnapshot())\n\(engine.status)\n\n\(diagnostics.snapshot())"
+        "\(engine.diagnosticsSnapshot())\n\(engine.status)\n\n\(diagnostics.snapshot())")
     }
 
     private func copyDiagnostics() {
@@ -281,7 +282,7 @@ final class MacMouseGestureApp: NSObject, NSApplicationDelegate {
                 try text.write(to: url, atomically: true, encoding: .utf8)
                 self?.model.message = "诊断快照已保存。"
             } catch {
-                self?.model.message = "无法保存诊断快照：\(error.localizedDescription)"
+                self?.model.message = DiagnosticRedactor.redact("无法保存诊断快照：\(error.localizedDescription)")
             }
         }
     }
