@@ -34,6 +34,7 @@ final class MacMouseGestureApp: NSObject, NSApplicationDelegate {
     private var observers: [NSObjectProtocol] = []
     private var signalSources: [DispatchSourceSignal] = []
     private let instance = SingleInstance()
+    private var hadAccessibility = false
     private var ownsInstance = false
 
     func applicationDidFinishLaunching(_ notification: Notification) {
@@ -69,9 +70,12 @@ final class MacMouseGestureApp: NSObject, NSApplicationDelegate {
         installLifecycleObservers()
         engine.onStatus = { [weak self] in self?.update() }
         refresh = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in self?.update() }
-        diagnostics.log("INFO", "macOS \(ProcessInfo.processInfo.operatingSystemVersionString); arm64; Build 4 horizontal baseline retained")
+        diagnostics.log("INFO", "macOS \(ProcessInfo.processInfo.operatingSystemVersionString); arm64; Beta Preview")
         update()
-        if !AXIsProcessTrusted() { showSettings(.general) }
+        if DiagnosticRedactor.installation() != "Applications" {
+            model.message = "建议将 MacMouseGesture 移动到“应用程序”文件夹。"
+        }
+        if model.onboardingVisible || !AXIsProcessTrusted() || model.message != nil { showSettings(.general) }
     }
 
     private func installApplicationMenu() {
@@ -138,6 +142,15 @@ final class MacMouseGestureApp: NSObject, NSApplicationDelegate {
     }
 
     private func installModelActions() {
+        model.finishOnboarding = { [weak self] in
+            guard let self, self.model.onboarding.step == .complete else { return }
+            self.model.onboarding.persistCompletion()
+            self.model.onboardingVisible = false
+        }
+        model.reopenOnboarding = { [weak self] in
+            self?.model.onboarding = OnboardingState()
+            self?.model.onboardingVisible = true
+        }
         model.applyConfig = { [weak self] config, debounce in self?.apply(config, debounce: debounce) }
         model.setLoginEnabled = { [weak self] enabled in self?.setLogin(enabled) }
         model.openAccessibility = { [weak self] in self?.openSystemSettings("Privacy_Accessibility") }
@@ -313,6 +326,12 @@ final class MacMouseGestureApp: NSObject, NSApplicationDelegate {
 
     private func update() {
         let authorized = AXIsProcessTrusted()
+        if hadAccessibility && !authorized {
+            engine.stop("Accessibility revoked")
+            automatic.requestRestartIfEnabled()
+            if !model.onboardingVisible { model.message = "需要重新授权：请前往系统设置 → 隐私与安全性 → 辅助功能。" }
+        }
+        hadAccessibility = authorized
         if automatic.takeStartIfReady(permissionGranted: authorized) {
             start(verticalPOC ? .missionControlPOC : .horizontal)
         }
@@ -322,6 +341,11 @@ final class MacMouseGestureApp: NSObject, NSApplicationDelegate {
         model.status = UserStatus.resolve(config: model.config, accessibility: authorized,
                                           pendingStart: automatic.pendingStart, engineStatus: engine.status)
         model.snapshot = engine.uiSnapshot()
+        let input = engine.onboardingInput()
+        model.sideButtonCount = input.count
+        model.lastSideButton = input.label
+        model.onboarding.observe(buttons: input.count)
+        model.waitingForButton = model.onboarding.waitingHint(at: monotonicTime())
         if window?.isVisible == true && model.selectedTab == .diagnostics { model.advancedReport = report() }
         updateMenu()
     }

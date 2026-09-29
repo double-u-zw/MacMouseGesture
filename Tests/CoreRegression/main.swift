@@ -14,6 +14,14 @@ if CommandLine.arguments.count == 3, ["--write-config-fixture", "--read-config-f
     }
     exit(store.load() == fixture ? 0 : 1)
 }
+if CommandLine.arguments.count == 4, CommandLine.arguments[1] == "--lock-fixture" {
+    let lock = SingleInstance()
+    let result = lock.acquire(directory: URL(fileURLWithPath: CommandLine.arguments[2]))
+    guard result == .acquired else { exit(result == .alreadyRunning ? 23 : 24) }
+    print("acquired"); fflush(stdout)
+    if CommandLine.arguments[3] == "hold" { sleep(30) }
+    withExtendedLifetime(lock) { exit(0) }
+}
 var failures = 0
 func fail(_ message: String, _ file: StaticString, _ line: UInt) {
     failures += 1; print("FAIL \(file):\(line): \(message)")
@@ -40,7 +48,15 @@ let configuration = ConfigTests()
 let boundary = BoundaryTests()
 let presentation = PresentationTests()
 let missionPOC = MissionControlPOCTests()
+let product = ProductizationTests()
 let checks: [(String, () throws -> Void)] = [
+    ("redact Unicode/space/encoded home and private filenames", product.testRedaction),
+    ("redact bounded recent logs at collection boundary", product.testLogBoundary),
+    ("single instance contention and release", product.testLock),
+    ("single instance separate process and crash recovery", product.testProcessLock),
+    ("single instance rejects symlink", product.testUnsafeLock),
+    ("onboarding fresh evidence, timeout and persistence", product.testOnboarding),
+    ("permission granted/revoked/optional display", product.testPermissionDisplay),
     ("button mapping", suite.testButtonNumbersAreZeroBasedAndOthersPreserved),
     ("dead zone", suite.testDeadZoneNeverEmitsAndTapDoesNothing),
     ("vertical axis lock", suite.testVerticalLockCannotTurnIntoHorizontalLater),

@@ -4,6 +4,9 @@ struct SettingsView: View {
     @ObservedObject var model: AppViewModel
 
     var body: some View {
+        if model.onboardingVisible {
+            OnboardingView(model: model)
+        } else {
         TabView(selection: $model.selectedTab) {
             GeneralSettingsView(model: model)
                 .tabItem { Label("通用", systemImage: "gearshape") }.tag(SettingsTab.general)
@@ -15,6 +18,7 @@ struct SettingsView: View {
                 .tabItem { Label("关于", systemImage: "info.circle") }.tag(SettingsTab.about)
         }
         .frame(minWidth: 510, idealWidth: 540, minHeight: 500, idealHeight: 540)
+        }
     }
 }
 
@@ -30,6 +34,7 @@ struct GeneralSettingsView: View {
                 }
                 .padding(.vertical, 5)
             }
+            Section { Button("首次设置与手势测试") { model.reopenOnboarding?() } }
             Section("应用") {
                 Toggle("启用 MacMouseGesture", isOn: model.binding(\.enabled))
                 Toggle("登录时启动", isOn: Binding(
@@ -49,7 +54,7 @@ struct GeneralSettingsView: View {
                 HStack {
                     Text("辅助功能权限")
                     Spacer()
-                    Text(model.accessibilityGranted ? "已授权" : "需要授权")
+                    Text(PermissionPresentation.accessibility(model.accessibilityGranted, completed: !OnboardingState.needsWelcome()))
                         .foregroundStyle(model.accessibilityGranted ? Color.secondary : Color.orange)
                     if !model.accessibilityGranted {
                         Button("打开系统设置") { model.openAccessibility?() }
@@ -58,7 +63,7 @@ struct GeneralSettingsView: View {
                 HStack {
                     Text("输入监控权限")
                     Spacer()
-                    Text(model.inputMonitoringGranted ? "已授权" : "未授权（可选）")
+                    Text(PermissionPresentation.inputMonitoring(model.inputMonitoringGranted))
                         .foregroundStyle(.secondary)
                     if !model.inputMonitoringGranted {
                         Button("打开系统设置") { model.openInputMonitoring?() }
@@ -183,6 +188,8 @@ struct DiagnosticsView: View {
                 }
             }
             Section {
+                Text("分享前请展开高级诊断检查内容；复制和保存会使用同一份脱敏报告。")
+                    .font(.caption).foregroundStyle(.secondary)
                 HStack {
                     Button("复制诊断信息") { model.copyDiagnostics?() }
                     Button("保存诊断快照") { model.saveDiagnostics?() }
@@ -208,8 +215,11 @@ struct AboutView: View {
             Text("MacMouseGesture").font(.title2.weight(.semibold))
             Text("版本 \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.1.6") · Build \(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "12")")
                 .foregroundStyle(.secondary)
-            Text("适用于 macOS 的原生鼠标手势工具。")
-            Text("针对 macOS 27 开发。").foregroundStyle(.secondary)
+            Text("让普通鼠标拥有类似触控板的 macOS 系统手势。")
+            Text("Early Beta · macOS 27 / Apple Silicon").foregroundStyle(.secondary)
+            Text("macOS: \(ProcessInfo.processInfo.operatingSystemVersionString)").font(.caption)
+            Text("Git Commit: \(Bundle.main.object(forInfoDictionaryKey: "GitCommit") as? String ?? "unknown")")
+                .font(.system(size: 10, design: .monospaced)).textSelection(.enabled)
             Divider().frame(width: 260)
             Text("© 2026").font(.caption).foregroundStyle(.secondary)
         }

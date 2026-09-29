@@ -81,6 +81,15 @@ final class GestureEngine {
                              sequenceErrors: counters.sequenceErrors)
         }
     }
+    // Read-only UI feedback; no input handling or gesture parameter changes.
+    func onboardingInput() -> (count: Int, label: String) {
+        queue.sync {
+            var input = previousInput
+            if let mailbox { input.add(mailbox.counts()) }
+            let label = "侧键 1：\(input.button4Downs) 次 · 侧键 2：\(input.button5Downs) 次"
+            return (input.button4Downs + input.button5Downs, label)
+        }
+    }
     func diagnosticsSnapshot() -> String {
         queue.sync {
             var input = previousInput

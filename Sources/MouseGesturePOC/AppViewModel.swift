@@ -13,6 +13,14 @@ final class AppViewModel: ObservableObject {
     @Published var advancedReport = ""
     @Published var message: String?
 
+    @Published var onboarding = OnboardingState()
+    @Published var onboardingVisible = OnboardingState.needsWelcome()
+    @Published var sideButtonCount = 0
+    @Published var waitingForButton = false
+    @Published var lastSideButton = ""
+    var finishOnboarding: (() -> Void)?
+    var reopenOnboarding: (() -> Void)?
+
     var applyConfig: ((AppConfig, Bool) -> Void)?
     var setLoginEnabled: ((Bool) -> Void)?
     var openAccessibility: (() -> Void)?
