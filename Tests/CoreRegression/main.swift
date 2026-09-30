@@ -49,7 +49,15 @@ let boundary = BoundaryTests()
 let presentation = PresentationTests()
 let missionPOC = MissionControlPOCTests()
 let product = ProductizationTests()
+let identity = IdentityMigrationTests()
 let checks: [(String, () throws -> Void)] = [
+    ("identity fresh domain uses defaults", identity.testFresh),
+    ("identity legacy settings preserved", identity.testLegacy),
+    ("identity new values win and missing fields migrate", identity.testNewWins),
+    ("identity migration idempotent and later edits preserved", identity.testIdempotency),
+    ("identity onboarding completion preserved, new value wins", identity.testOnboarding),
+    ("identity unrelated keys not copied and legacy retained", identity.testIsolation),
+    ("identity malformed destination is not overwritten", identity.testMalformedNewWins),
     ("device removal recovers once respecting permission, sleep, stop and retry budget", product.testDeviceRemovalRecovery),
     ("diagnostic redaction preserves technical ratios", product.testTechnicalRatiosPreserved),
     ("redact Unicode/space/encoded home and private filenames", product.testRedaction),

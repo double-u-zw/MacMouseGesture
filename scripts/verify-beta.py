@@ -6,8 +6,8 @@ def verify(bundle):
     bundle = pathlib.Path(bundle)
     with (bundle / 'Contents/Info.plist').open('rb') as f:
         p = plistlib.load(f)
-    expected = dict(CFBundleIdentifier='local.macmousegesture.poc', CFBundleExecutable='MacMouseGesture',
-                    CFBundleName='MacMouseGesture', CFBundleIconFile='MacMouseGesture', CFBundleShortVersionString='0.2.0', CFBundleVersion='15',
+    expected = dict(CFBundleIdentifier='io.github.double-u-zw.macmousegesture', CFBundleExecutable='MacMouseGesture',
+                    CFBundleName='MacMouseGesture', CFBundleIconFile='MacMouseGesture', CFBundleShortVersionString='0.2.0-beta.1', CFBundleVersion='16',
                     BetaVersion='0.2.0-beta.1', CFBundlePackageType='APPL', LSMinimumSystemVersion='27.0', LSUIElement=True)
     for key, value in expected.items():
         assert p.get(key) == value, f'invalid {key}'
@@ -30,6 +30,7 @@ def verify(bundle):
     assert not list(bundle.rglob('*.dSYM')), 'symbols in user artifact'
     subprocess.run(['codesign', '--verify', '--deep', '--strict', str(bundle)], check=True)
     signature = subprocess.check_output(['codesign', '-d', '--verbose=4', str(bundle)], stderr=subprocess.STDOUT, text=True)
+    assert 'Identifier=io.github.double-u-zw.macmousegesture\n' in signature, 'wrong signing identifier'
     assert 'runtime' in signature, 'hardened runtime missing'
     entitlements = subprocess.check_output(['codesign', '-d', '--entitlements', ':-', str(bundle)], stderr=subprocess.DEVNULL)
     assert not entitlements.strip() or not plistlib.loads(entitlements), 'unexpected entitlements'

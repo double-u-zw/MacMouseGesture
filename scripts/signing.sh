@@ -15,13 +15,13 @@ prepare_signing() {
     /usr/bin/security unlock-keychain -p "$(< "$signing_dir/password")" "$signing_dir/development.keychain-db"
     signing_keychain_args=(--keychain "$signing_dir/development.keychain-db")
   fi
-  signing_requirement="designated => identifier \"local.macmousegesture.poc\" and certificate leaf = H\"$signing_identity\""
+  signing_requirement="designated => identifier \"io.github.double-u-zw.macmousegesture\" and certificate leaf = H\"$signing_identity\""
 }
 sign_bundle() {
   local target_bundle="$1"
   /usr/bin/codesign --force --sign "$signing_identity" "${signing_keychain_args[@]}" \
-    --identifier local.macmousegesture.poc --timestamp=none \
+    --identifier io.github.double-u-zw.macmousegesture --timestamp=none \
     --requirements "=$signing_requirement" --entitlements Resources/Entitlements.plist "$target_bundle"
   /usr/bin/codesign --verify --deep --strict --verbose=2 "$target_bundle"
-  /usr/bin/codesign --verify --strict -R "=identifier \"local.macmousegesture.poc\" and certificate leaf = H\"$signing_identity\"" "$target_bundle"
+  /usr/bin/codesign --verify --strict -R "=identifier \"io.github.double-u-zw.macmousegesture\" and certificate leaf = H\"$signing_identity\"" "$target_bundle"
 }

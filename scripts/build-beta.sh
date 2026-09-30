@@ -27,7 +27,7 @@ bundle="$work/build/MacMouseGesture.app"
 source scripts/signing.sh
 prepare_signing
 /usr/bin/codesign --force --sign "$signing_identity" "${signing_keychain_args[@]}" \
-  --identifier local.macmousegesture.poc --options runtime --timestamp=none \
+  --identifier io.github.double-u-zw.macmousegesture --options runtime --timestamp=none \
   --requirements "=$signing_requirement" --entitlements Resources/Entitlements.plist "$bundle"
 python3 scripts/verify-beta.py "$bundle"
 python3 scripts/test-beta-package.py "$bundle"
@@ -51,9 +51,9 @@ cp "$work/tests.txt" "$work/probe.txt" "$work/result/developer/"
 xcrun dwarfdump --uuid "$bundle/Contents/MacOS/MacMouseGesture" > "$work/result/developer/executable-uuid.txt"
 xcrun dwarfdump --uuid "$work/build/MacMouseGesture.app.dSYM" > "$work/result/developer/dsym-uuid.txt"
 [[ "$(cut -d ' ' -f 2 "$work/result/developer/executable-uuid.txt")" == "$(cut -d ' ' -f 2 "$work/result/developer/dsym-uuid.txt")" ]]
-print -r -- "version=$version build=15 commit=$commit signing=local-self-signed hardened-runtime=true" > "$work/result/developer/build.txt"
+print -r -- "version=$version build=16 commit=$commit signing=local-self-signed hardened-runtime=true" > "$work/result/developer/build.txt"
 (cd "$work/result" && shasum -a 256 "MacMouseGesture-$version.dmg" > SHA256SUMS && shasum -a 256 -c SHA256SUMS)
-output="$root/build/beta-preview/$version-build15-$commit"
+output="$root/build/beta-preview/$version-build16-$commit"
 [[ ! -e "$output" ]] || { print -u2 'Archive already exists; refusing to overwrite.'; exit 1; }
 mkdir -p "${output:h}"
 mv "$work/result" "$output"

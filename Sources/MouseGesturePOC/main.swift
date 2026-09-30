@@ -22,7 +22,7 @@ final class MacMouseGestureApp: NSObject, NSApplicationDelegate {
     private lazy var engine = GestureEngine(log: diagnostics)
     private let store = ConfigStore()
     private let loginItem = LoginItemController()
-    private let model = AppViewModel()
+    private lazy var model = AppViewModel()
     private var automatic = AutoStartState()
     private var window: NSWindow?
     private var statusItem: NSStatusItem?
@@ -39,7 +39,7 @@ final class MacMouseGestureApp: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Older builds used a directory-local lock. Do not run beside a live legacy copy.
-        let legacy = NSRunningApplication.runningApplications(withBundleIdentifier: "local.macmousegesture.poc")
+        let legacy = NSRunningApplication.runningApplications(withBundleIdentifier: ProductIdentity.legacy)
             .first { other in
                 guard other.processIdentifier != getpid(), let url = other.bundleURL,
                       let bundle = Bundle(url: url) else { return false }
@@ -48,7 +48,8 @@ final class MacMouseGestureApp: NSObject, NSApplicationDelegate {
         let result = legacy == nil ? instance.acquire() : .alreadyRunning
         guard result == .acquired else {
             if result == .alreadyRunning {
-                (legacy ?? NSRunningApplication.runningApplications(withBundleIdentifier: "local.macmousegesture.poc")
+                (legacy ?? [ProductIdentity.current, ProductIdentity.legacy]
+                    .flatMap { NSRunningApplication.runningApplications(withBundleIdentifier: $0) }
                     .first { $0.processIdentifier != getpid() })?.activate(options: [])
                 NSLog("MacMouseGesture 已在运行；此副本退出。")
             } else {
@@ -61,6 +62,7 @@ final class MacMouseGestureApp: NSObject, NSApplicationDelegate {
             return
         }
         ownsInstance = true
+        ProductIdentity.migrateSettings()
         model.show(store.load())
         if !model.config.shouldRun { automatic.stop() }
         NSApp.setActivationPolicy(.accessory)

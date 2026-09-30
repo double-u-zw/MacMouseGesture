@@ -9,7 +9,7 @@ fi
 source scripts/signing.sh
 prepare_signing
 # Identity fields cannot drift when only the version is meant to change.
-[[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' Resources/Info.plist)" == local.macmousegesture.poc ]]
+[[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' Resources/Info.plist)" == io.github.double-u-zw.macmousegesture ]]
 [[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' Resources/Info.plist)" == MacMouseGesture ]]
 [[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleName' Resources/Info.plist)" == 'MacMouseGesture' ]]
 compile_core

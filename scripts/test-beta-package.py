@@ -5,13 +5,15 @@ source = pathlib.Path(sys.argv[1])
 verifier = pathlib.Path(__file__).with_name('verify-beta.py')
 with tempfile.TemporaryDirectory() as temp:
     target = pathlib.Path(temp) / 'MacMouseGesture.app'
-    for mutation in ['version', 'commit', 'dirty', 'notices', 'icon', 'binary']:
+    for mutation in ['version', 'marketing', 'identity', 'commit', 'dirty', 'notices', 'icon', 'binary']:
         if target.exists(): shutil.rmtree(target)
         shutil.copytree(source, target)
         plist = target / 'Contents/Info.plist'
-        if mutation in ['version', 'commit', 'dirty']:
+        if mutation in ['version', 'marketing', 'identity', 'commit', 'dirty']:
             p = plistlib.loads(plist.read_bytes())
             if mutation == 'version': p['CFBundleVersion'] = '12'
+            if mutation == 'marketing': p['CFBundleShortVersionString'] = '0.2.0'
+            if mutation == 'identity': p['CFBundleIdentifier'] = 'local.macmousegesture.poc'  # legacy rejection fixture
             if mutation == 'commit': p.pop('GitCommit')
             if mutation == 'dirty': p['SourceTreeDirty'] = True
             plist.write_bytes(plistlib.dumps(p))

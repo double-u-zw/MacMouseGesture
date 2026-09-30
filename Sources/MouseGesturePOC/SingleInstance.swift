@@ -6,6 +6,8 @@ import Darwin
 final class SingleInstance {
     enum Result: Equatable { case acquired, alreadyRunning, unavailable }
     private var descriptor: Int32 = -1
+    // LEGACY_PRODUCT_ID: stable compatibility namespace shared with Builds 13–15.
+    // Do not migrate or unlink this inode when the product bundle identifier changes.
     static var directory: URL {
         FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Library/Application Support/local.macmousegesture.poc", isDirectory: true)
