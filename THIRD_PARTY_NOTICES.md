@@ -9,9 +9,9 @@
 - Research snapshot: `a7ac3ecc86acf4ddb309ce1007472439a2f9d42a`.
 - Reviewed license: [custom MMF License](https://github.com/noah-nuebling/mac-mouse-fix/blob/0c0fc99e65b3b09e083cbedc71c4d83fe21d1075/License), not MIT, Apache or GPL.
 
-SystemGestureBridge's DockSwipe event construction, phase encoding, progress/flavor/motion fields, terminal velocity child and event attachment were informed by and conservatively classified as adapted from MMF research/implementation. Input coalescing and gesture semantics also drew conceptual inspiration. Renaming or rewriting in another wrapper is not proof of independent origin. No claim is made that all code is wholly independently original.
+Early research into macOS system gestures included studying Mac Mouse Fix. The Bridge through Build 14 was conservatively classified as structurally derived in its two event constructors. Input coalescing and gesture semantics also drew conceptual inspiration. This historical acknowledgement remains applicable to those earlier sources and binaries; their obligations are not removed by replacing the current implementation.
 
-The copied-expression/derivative scope and source/binary publication conditions still require confirmation. Attribution does not imply endorsement or permission. See [the per-file audit](docs/third-party-audit.md). Do not publish the repository or binary on the assumption that a free Beta is exempt.
+For Build 15, both constructors were removed and replaced with `SystemGestureEventBuilder`, written from this project's functional interface specification and behavior contracts, recorded ABI/protocol facts, and runtime readback. No MMF or comparison-project source was used as a coding template during this replacement. The current source-tree engineering review found no remaining MMF code-level derivative. This is not a legal guarantee, a claim of never having studied MMF, or an attribution-based grant of permission. MMF attribution here identifies historical research and earlier code, rather than describing the new builder as MMF-derived. See [current and historical provenance](docs/system-gesture-provenance.md).
 
 ## Apple open-source interfaces
 
