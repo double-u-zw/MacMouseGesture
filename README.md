@@ -53,6 +53,6 @@ MacMouseGesture 需要“辅助功能”权限，将侧键拖动转换为系统�
 
 ## License / Acknowledgements
 
-项目整体许可证尚未确定；仓库可见不代表已授予任意复制、修改或再分发许可。
+MacMouseGesture 自有源代码采用 [MIT License](LICENSE)。第三方组件、接口和历史研究材料的说明见[第三方致谢](THIRD_PARTY_NOTICES.md)，这些说明不改变各自适用的条款。
 
 早期系统手势研究参考过 Mac Mouse Fix，旧实现的历史归因保留。当前 Bridge 已按项目功能规格替换，工程来源审计未发现当前实现中的 MMF 代码派生部分；这不是法律保证。[第三方致谢](THIRD_PARTY_NOTICES.md) · [来源记录](docs/system-gesture-provenance.md)。
