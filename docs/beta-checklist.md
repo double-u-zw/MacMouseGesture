@@ -1,12 +1,12 @@
 # Beta Preview checklist
 
-目标：0.2.0-beta.1 / Build 13。本文件区分自动检查、真人验收、公共发布 Gate。未完成项不会推定通过。
+目标：0.2.0-beta.1 / Build 14。本文件区分自动检查、真人验收、公共发布 Gate。未完成项不会推定通过。
 
 ## 自动与文档
 
 - [x] Phase 0 独立 commit；Beta 在 productization/github-beta
-- [x] build PASS：c5e1526，Hardened Runtime，自签名、空 entitlements
-- [x] 原 58 项回归 + 新增 7 项产品化检查，65 / 0 failures（最终打包构建）
+- [x] build PASS：e28f25d，Hardened Runtime，自签名、空 entitlements
+- [x] 原 58 项回归 + 新增 9 项产品化/恢复检查，67 / 0 failures（最终打包构建）
 - [x] diagnostics redacted：集中日志入口、报告出口、UI 错误与 probe
 - [x] single instance：进程互斥、崩溃释放、symlink 拒绝自动检查
 - [x] onboarding state：持久化、超时、真实新输入与确认门槛自动检查
@@ -48,3 +48,5 @@
 ## 当前关闭结论
 
 PRIV-01：CLOSED（集中脱敏、出口源码检查与自动测试）。INSTALL-01：CLOSED（用户级锁与 7 项实际启动/多副本检查）。HR-01：Pending human acceptance；本轮未收到真人结果，不将 probe 或输入计数当作四方向验收。详细证据边界见 [beta-validation.md](beta-validation.md)。
+
+2026-09-30：已修复鼠标移除后永久停用，Build 14 已安装且引擎运行。用户确认此前重开能恢复；真正断连/重连自动恢复仍待真人确认。
