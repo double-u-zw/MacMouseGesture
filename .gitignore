@@ -30,3 +30,11 @@ baselines/**/*
 !baselines/**/SHA256SUMS
 !baselines/**/test-output.txt
 !baselines/**/tests-rechecked.txt
+
+# Distribution products and user-exported diagnostics (never source assets).
+*.app/
+*.dSYM/
+*.xcarchive/
+*.dmg
+diagnostic-exports/
+MacMouseGesture-诊断*.txt
