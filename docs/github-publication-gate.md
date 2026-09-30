@@ -1,3 +1,19 @@
+# Build 16 identity migration gate
+
+Build 15 core gestures: user hardware acceptance PASS. Current identity migration adopts `io.github.double-u-zw.macmousegesture`; tests 89/89 PASS. Build 16 packaging/installation acceptance is recorded in [migration report](build16-identity-migration.md). No publishing is authorized.
+
+- CORE_GESTURES = PASS (Build 15 user acceptance; implementation frozen)
+- MMF_SOURCE_PROVENANCE = PASS (current engineering scope)
+- MMF_BINARY_LICENSE = CLOSED (current replacement source; historical limitations retained)
+- BUNDLE_ID = PENDING_BUILD16_INSTALLATION
+- GIT_HISTORY_PRIVACY = OWNER_DECISION
+- APPLE_PRIVATE_API = OWNER_DECISION
+- SIGNING_NOTARIZATION = OWNER_DECISION
+
+---
+
+## Prior Build 15 gate record (historical)
+
 # GitHub first public Preview gate
 
 Date: 2026-09-30. Current branch: `productization/github-beta`. This gate does not publish, push, create a tag, or rewrite history.
@@ -38,7 +54,7 @@ See [provenance](system-gesture-provenance.md), [specification](system-gesture-b
 
 ## OWNER_DECISION
 
-- **Bundle ID:** choose the permanent reverse-DNS ID before producing the first public Preview binary. See [bundle ID audit](bundle-id-audit.md). `local.macmousegesture.poc` is the current development ID.
+- **Bundle ID:** owner selected `io.github.double-u-zw.macmousegesture` for Build 16. See [bundle ID audit](bundle-id-audit.md); the earlier temporary ID is historical.
 - **Git history:** accept the personal author/committer email and historical public certificate fingerprint, or authorize a reviewed clean public history plan. See [history privacy audit](git-history-privacy-audit.md).
 - **Distribution:** decide whether a non-notarized, non-Developer-ID package is acceptable for a limited Preview. Do not present it as a normal trusted download.
 - **MMF route:** independent implementation completed; inspect its evidence and retain historical obligations. No permission request was sent.
