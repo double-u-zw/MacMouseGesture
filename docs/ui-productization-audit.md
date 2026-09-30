@@ -31,3 +31,16 @@ Validation will distinguish automatic tests/compilation from real visual/hardwar
 - 77/77 Swift checks + 15/15 Bridge contracts = **92/92 PASS** (89 prior + 3 UI wording tests).
 - Isolated SwiftUI/AppKit compile and dSYM generation PASS. Only existing Swift legacy-driver deprecation warnings appeared.
 - GUI and physical mouse smoke results will be recorded separately. The appearance is subject to user visual acceptance, not an automated aesthetic verdict.
+
+
+## Installed UI candidate and user confirmation
+
+- UI code commit `6bb9bcb`; built source `290b12bea3fb57951cf1f1b35303c8e86d779ba0`.
+- App artifact: `<project-root>/build/ui-preview/0.2.0-beta.1-build16-290b12bea3fb57951cf1f1b35303c8e86d779ba0/MacMouseGesture.app` (separate from the immutable Build 16 identity candidate/DMG).
+- Installed `/Applications/MacMouseGesture.app`: permanent ID, version 0.2.0-beta.1, Build 16, GitCommit matches source; strict signature/bundle verifier PASS. Running executable confirmed at the installed path (PID 51248 when checked).
+- User explicitly confirmed: “正常显示，主要开关完整可见” for the new three-entry settings/help/about window. No claim of automated aesthetic approval.
+- Actual persisted settings and onboarding values unchanged after replacement. System registration readback after app restart: one enabled permanent-ID login item; legacy entry remains disabled. User had confirmed enabling new login registration succeeded.
+- Native UI automation retained stale legacy identity / timed out for the new identity. Therefore no automated claim is made that all onboarding/About/menu/permission refresh screens were exercised. Their source compiles and existing state/persistence tests pass; full visual review remains manual.
+- Protected implementation files compared to identity completion commit `98bb456`: Bridge, GestureCore, mouse input, HID observation, engine/recovery, single-instance, ProductIdentity migration, LoginItemController, ConfigStore and OnboardingState all unchanged. main.swift UI diff is limited to menu construction/status wording and window size.
+- Hardware smoke (both buttons, Spaces/Mission Control/App Exposé and reconnect) was not performed during this UI pass. Build 15 user acceptance remains the historical core baseline.
+- Manual pages: main settings; welcome; permissions; side-button test; completion; About/acknowledgements; menu bar. Also inspect expanded feel controls and help/diagnostic disclosure. Completion requires actual side-button detection and user gesture confirmation; do not bypass it just to obtain a screenshot.
