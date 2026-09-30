@@ -1,6 +1,6 @@
 import SwiftUI
 
-enum SettingsTab: Hashable { case general, gestures, diagnostics, about }
+enum SettingsTab: Hashable { case general, diagnostics, about }
 
 final class AppViewModel: ObservableObject {
     @Published private(set) var config: AppConfig

@@ -59,3 +59,34 @@ enum GestureSettings {
         (5000 * pow(1.0 / 50.0, min(1, max(0, position)))).rounded()
     }
 }
+
+// User-facing wording only; engine state resolution remains unchanged.
+extension UserStatus {
+    var displayLabel: String {
+        switch self {
+        case .running: "正在运行"
+        case .disabled: "已停用"
+        case .permissionRequired: "需要开启权限"
+        case .recovering: "正在连接鼠标"
+        case .error: "系统手势暂时不可用"
+        }
+    }
+    var guidance: String? {
+        switch self {
+        case .running, .disabled: nil
+        case .permissionRequired: "请开启辅助功能权限。"
+        case .recovering: "请确认鼠标已连接。"
+        case .error: "请重新尝试；若仍无法使用，可在帮助页查看诊断。"
+        }
+    }
+}
+
+enum UserMessage {
+    static func display(_ message: String?) -> String? {
+        guard let message else { return nil }
+        if message.hasPrefix("无法更改登录启动设置") { return "无法更改登录启动，请在帮助页查看诊断。" }
+        if message.hasPrefix("无法保存诊断快照") { return "无法导出诊断信息，请选择其他保存位置。" }
+        if message.hasPrefix("鼠标连接频繁变化") { return "鼠标连接不稳定。连接恢复后，请点击“重新尝试”。" }
+        return message
+    }
+}

@@ -2,62 +2,107 @@ import SwiftUI
 
 struct OnboardingView: View {
     @ObservedObject var model: AppViewModel
+    @State private var optionalPermission = false
+    private var stepNumber: Int {
+        switch model.onboarding.step {
+        case .welcome: 1
+        case .permissions: 2
+        case .test: 3
+        case .complete: 4
+        }
+    }
     var body: some View {
-        VStack(alignment: .leading, spacing: 18) {
-            Text("MacMouseGesture · Early Beta").font(.caption).foregroundStyle(.secondary)
+        VStack(alignment: .leading, spacing: 20) {
+            HStack {
+                Image(nsImage: NSImage(named: NSImage.applicationIconName) ?? NSImage())
+                    .resizable().frame(width: 36, height: 36).accessibilityHidden(true)
+                Text("MacMouseGesture").font(.headline)
+                Spacer()
+                Text("设置 · \(stepNumber) / 4").font(.caption).foregroundStyle(.secondary)
+            }
+            Divider()
             switch model.onboarding.step {
             case .welcome:
-                Text("欢迎使用 MacMouseGesture").font(.title2.bold())
-                Text("用鼠标侧键控制 macOS 原生手势。")
-                Text("← / →   切换桌面空间\n\n↑          调度中心\n\n↓          应用 Exposé")
-                Text("主要验证环境：macOS 27 / Apple Silicon。使用非公开系统接口，系统升级可能影响兼容性。")
+                Text("鼠标，也可以用手势").font(.title2.weight(.semibold))
+                Text("按住鼠标侧键并拖动，轻松切换桌面和查看窗口。")
+                    .foregroundStyle(.secondary)
+                GestureMap().padding(.vertical, 12)
+                Text("需要一只带侧键的鼠标。两颗侧键共用同一套手势设置。")
                     .font(.callout).foregroundStyle(.secondary)
-                Button("开始设置") { model.onboarding.step = .permissions }.buttonStyle(.borderedProminent)
+                Spacer()
+                Button("开始设置") { model.onboarding.step = .permissions }
+                    .buttonStyle(.borderedProminent).controlSize(.large)
             case .permissions:
-                Text("授予权限").font(.title2.bold())
-                Text("辅助功能 · \(PermissionPresentation.accessibility(model.accessibilityGranted, completed: !OnboardingState.needsWelcome()))").bold()
-                Text("用于通过系统事件监听鼠标侧键、拖动并控制系统手势。")
-                Button("打开辅助功能设置") { model.openAccessibility?() }
-                Text("输入监控 · \(PermissionPresentation.inputMonitoring(model.inputMonitoringGranted))").bold()
-                Text("用于可选的 HID 鼠标输入观察和设备诊断；未授权时仍可尝试手势。")
-                Button("打开输入监控设置") { model.openInputMonitoring?() }
-                Text("在系统设置中允许 MacMouseGesture。此页面会自动更新授权状态。")
+                Text("开启辅助功能权限").font(.title2.weight(.semibold))
+                Text("MacMouseGesture 需要“辅助功能”权限，才能将鼠标侧键拖动转换为 macOS 系统手势。")
+                    .foregroundStyle(.secondary)
+                Label(model.accessibilityGranted ? "辅助功能权限已开启" : "等待开启辅助功能权限",
+                      systemImage: model.accessibilityGranted ? "checkmark.circle" : "lock")
+                Button("打开系统设置") { model.openAccessibility?() }
+                Text("在系统设置中允许 MacMouseGesture，此页面会自动更新。")
                     .font(.callout).foregroundStyle(.secondary)
-                Button("测试鼠标手势") {
+                DisclosureGroup("可选：输入监控", isExpanded: $optionalPermission) {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text("用于额外的鼠标兼容性诊断，未开启也可以使用手势。")
+                            .font(.callout).foregroundStyle(.secondary)
+                        Text(model.inputMonitoringGranted ? "输入监控已开启" : "输入监控未开启")
+                        Button("打开输入监控设置") { model.openInputMonitoring?() }
+                    }.padding(.top, 8)
+                }
+                Spacer()
+                Button("继续") {
                     model.onboarding.beginTest(at: monotonicTime(), buttons: model.sideButtonCount)
-                }.disabled(!model.accessibilityGranted)
+                }
+                .buttonStyle(.borderedProminent).controlSize(.large)
+                .disabled(!model.accessibilityGranted)
             case .test:
-                Text("测试鼠标手势").font(.title2.bold())
-                Text("按住任一侧键并拖动鼠标。\n← / → 切换桌面空间 · ↑ 调度中心 · ↓ 应用 Exposé")
-                Text("手势引擎：\(model.status.rawValue)")
+                Text("测试你的鼠标侧键").font(.title2.weight(.semibold))
+                Text("请按下鼠标侧键，确认能够识别后，再按住侧键拖动试试。")
+                    .foregroundStyle(.secondary)
+                GestureMap()
                 if !model.accessibilityGranted {
-                    Button("需要重新授权：打开系统设置") { model.openAccessibility?() }
+                    Button("需要开启权限：打开系统设置") { model.openAccessibility?() }
                 }
                 if !model.config.shouldRun {
-                    Button("打开手势设置以启用") { model.onboardingVisible = false; model.selectedTab = .gestures }
+                    Button("前往设置启用手势") { model.onboardingVisible = false; model.selectedTab = .general }
                 }
                 if model.onboarding.detectedSideButton {
-                    Text("已检测到侧键输入").foregroundStyle(.green)
-                    Text(model.lastSideButton).font(.callout)
+                    Label("已检测到侧键", systemImage: "checkmark.circle.fill")
+                        .foregroundStyle(.tint)
                 } else if model.waitingForButton {
-                    Text("暂未检测到鼠标侧键。\n请确认鼠标具有额外侧键，或尝试按下其他鼠标按键。")
-                        .foregroundStyle(.orange)
+                    Label("尚未检测到侧键，请检查鼠标连接并换一颗侧键试试。", systemImage: "computermouse")
+                        .foregroundStyle(.secondary)
                 } else {
-                    Text("等待侧键输入…").foregroundStyle(.secondary)
+                    Label("等待侧键输入…", systemImage: "computermouse").foregroundStyle(.secondary)
                 }
-                Text("输入计数不能证明系统动画正常，请观察屏幕上的实际效果。")
-                    .font(.callout).foregroundStyle(.secondary)
-                Toggle("我已看到手势正常工作", isOn: $model.onboarding.confirmedGesture)
-                Button("继续") { model.onboarding.step = .complete }
-                    .disabled(!model.onboarding.canComplete(accessibility: model.accessibilityGranted, running: model.status == .running))
-                Button("稍后测试（不标记完成）") { model.onboardingVisible = false }
+                Toggle("我已看到桌面或窗口随手势切换", isOn: $model.onboarding.confirmedGesture)
+                if model.accessibilityGranted && model.config.shouldRun && model.status != .running {
+                    Text(model.status.displayLabel).font(.callout).foregroundStyle(.secondary)
+                }
+                Spacer()
+                HStack {
+                    Button("稍后设置") { model.onboardingVisible = false }
+                    Spacer()
+                    Button("继续") { model.onboarding.step = .complete }
+                        .buttonStyle(.borderedProminent).controlSize(.large)
+                        .disabled(!model.onboarding.canComplete(accessibility: model.accessibilityGranted, running: model.status == .running))
+                }
             case .complete:
-                Text("设置完成").font(.title2.bold())
-                Text("MacMouseGesture 会继续在菜单栏运行。\n以后可以通过“菜单栏 → 设置”调整配置。")
-                Button("完成") { model.finishOnboarding?() }.buttonStyle(.borderedProminent)
+                Image(systemName: "checkmark.circle").font(.system(size: 40)).foregroundStyle(.tint)
+                    .accessibilityHidden(true)
+                Text("准备好了").font(.title2.weight(.semibold))
+                Text("现在可以用鼠标侧键控制桌面与窗口。")
+                Text("MacMouseGesture 会在菜单栏运行，随时可以打开设置。")
+                    .foregroundStyle(.secondary)
+                Spacer()
+                Button("开始使用") { model.finishOnboarding?() }
+                    .buttonStyle(.borderedProminent).controlSize(.large)
             }
-            if let message = model.message { Text(message).font(.callout).foregroundStyle(.orange) }
-            Spacer(minLength: 0)
-        }.padding(30).frame(minWidth: 510, minHeight: 500)
+            if let message = UserMessage.display(model.message) {
+                Text(message).font(.callout).foregroundStyle(.secondary)
+            }
+        }
+        .padding(30)
+        .frame(minWidth: 530, minHeight: 580)
     }
 }

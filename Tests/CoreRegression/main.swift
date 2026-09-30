@@ -50,7 +50,11 @@ let presentation = PresentationTests()
 let missionPOC = MissionControlPOCTests()
 let product = ProductizationTests()
 let identity = IdentityMigrationTests()
+let ui = UIPresentationTests()
 let checks: [(String, () throws -> Void)] = [
+    ("UI status uses user-facing language", ui.testFriendlyStatus),
+    ("UI errors hide internal details", ui.testErrorsStayInDiagnostics),
+    ("UI useful messages remain visible", ui.testUsefulMessagesRemain),
     ("identity fresh domain uses defaults", identity.testFresh),
     ("identity legacy settings preserved", identity.testLegacy),
     ("identity new values win and missing fields migrate", identity.testNewWins),

@@ -28,7 +28,6 @@ final class MacMouseGestureApp: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
     private var statusMenuItem: NSMenuItem?
     private var enableMenuItem: NSMenuItem?
-    private var loginMenuItem: NSMenuItem?
     private var refresh: Timer?
     private var settingDebounce: Timer?
     private var observers: [NSObjectProtocol] = []
@@ -134,17 +133,7 @@ final class MacMouseGestureApp: NSObject, NSApplicationDelegate {
         let settings = NSMenuItem(title: "设置…", action: #selector(openSettingsFromMenu), keyEquivalent: "")
         settings.target = self
         menu.addItem(settings)
-        let diagnosticsItem = NSMenuItem(title: "诊断…", action: #selector(openDiagnosticsFromMenu), keyEquivalent: "")
-        diagnosticsItem.target = self
-        menu.addItem(diagnosticsItem)
-        let restart = NSMenuItem(title: "重新启动手势引擎", action: #selector(restartFromMenu), keyEquivalent: "")
-        restart.target = self
-        menu.addItem(restart)
         menu.addItem(NSMenuItem.separator())
-        let login = NSMenuItem(title: "登录时启动", action: #selector(toggleLoginFromMenu), keyEquivalent: "")
-        login.target = self
-        menu.addItem(login)
-        loginMenuItem = login
         let about = NSMenuItem(title: "关于 MacMouseGesture", action: #selector(openAboutFromMenu), keyEquivalent: "")
         about.target = self
         menu.addItem(about)
@@ -217,7 +206,7 @@ final class MacMouseGestureApp: NSObject, NSApplicationDelegate {
 
     private func makeWindow() -> NSWindow {
         if let window { return window }
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 540, height: 540),
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 550, height: 620),
                               styleMask: [.titled, .closable, .miniaturizable], backing: .buffered, defer: false)
         window.title = "MacMouseGesture 设置"
         window.isReleasedWhenClosed = false
@@ -330,9 +319,8 @@ final class MacMouseGestureApp: NSObject, NSApplicationDelegate {
 
     private func updateMenu() {
         let prefix = model.status == .disabled ? "○" : "●"
-        statusMenuItem?.title = "\(prefix) \(model.status.rawValue)"
+        statusMenuItem?.title = "\(prefix) \(model.status.displayLabel)"
         enableMenuItem?.state = model.config.enabled ? .on : .off
-        loginMenuItem?.state = model.loginState.isSelected ? .on : .off
     }
 
     private func update() {

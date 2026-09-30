@@ -2,228 +2,221 @@ import SwiftUI
 
 struct SettingsView: View {
     @ObservedObject var model: AppViewModel
-
     var body: some View {
         if model.onboardingVisible {
             OnboardingView(model: model)
         } else {
-        TabView(selection: $model.selectedTab) {
-            GeneralSettingsView(model: model)
-                .tabItem { Label("通用", systemImage: "gearshape") }.tag(SettingsTab.general)
-            GestureSettingsView(model: model)
-                .tabItem { Label("手势", systemImage: "computermouse") }.tag(SettingsTab.gestures)
-            DiagnosticsView(model: model)
-                .tabItem { Label("诊断", systemImage: "waveform.path.ecg") }.tag(SettingsTab.diagnostics)
-            AboutView()
-                .tabItem { Label("关于", systemImage: "info.circle") }.tag(SettingsTab.about)
+            TabView(selection: $model.selectedTab) {
+                GeneralSettingsView(model: model)
+                    .tabItem { Label("设置", systemImage: "computermouse") }.tag(SettingsTab.general)
+                DiagnosticsView(model: model)
+                    .tabItem { Label("帮助", systemImage: "questionmark.circle") }.tag(SettingsTab.diagnostics)
+                AboutView()
+                    .tabItem { Label("关于", systemImage: "info.circle") }.tag(SettingsTab.about)
+            }
+            .frame(minWidth: 530, idealWidth: 550, minHeight: 600, idealHeight: 620)
         }
-        .frame(minWidth: 510, idealWidth: 540, minHeight: 500, idealHeight: 540)
+    }
+}
+
+struct ProductHeading: View {
+    var body: some View {
+        HStack(spacing: 12) {
+            Image(nsImage: NSImage(named: NSImage.applicationIconName) ?? NSImage())
+                .resizable().frame(width: 48, height: 48).accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 4) {
+                Text("MacMouseGesture").font(.title2.weight(.semibold))
+                Text("让普通鼠标也能使用类似触控板的系统手势")
+                    .font(.callout).foregroundStyle(.secondary)
+            }
         }
+        .padding(.vertical, 4)
+    }
+}
+
+struct GestureMap: View {
+    var body: some View {
+        VStack(alignment: .leading, spacing: 8) {
+            Label("左右拖动 · 切换桌面", systemImage: "arrow.left.and.right")
+            Label("向上拖动 · 调度中心", systemImage: "arrow.up")
+            Label("向下拖动 · 应用 Exposé", systemImage: "arrow.down")
+        }
+        .font(.callout)
     }
 }
 
 struct GeneralSettingsView: View {
     @ObservedObject var model: AppViewModel
-
+    @State private var feelExpanded = false
     var body: some View {
         Form {
+            Section { ProductHeading() }
             Section {
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("MacMouseGesture").font(.title2.weight(.semibold))
-                    Text("用鼠标手势轻松操作 Mac。").foregroundStyle(.secondary)
-                }
-                .padding(.vertical, 5)
-            }
-            Section { Button("首次设置与手势测试") { model.reopenOnboarding?() } }
-            Section("应用") {
                 Toggle("启用 MacMouseGesture", isOn: model.binding(\.enabled))
                 Toggle("登录时启动", isOn: Binding(
-                    get: { model.loginState.isSelected },
-                    set: { model.setLoginEnabled?($0) }
-                ))
-                if model.loginState == .requiresApproval {
+                    get: { model.loginState.isSelected }, set: { model.setLoginEnabled?($0) }))
+                if model.loginState == .requiresApproval || model.loginState == .unavailable {
                     HStack {
-                        Text(model.loginState.label).foregroundStyle(.secondary)
+                        Text(model.loginState.label).font(.callout).foregroundStyle(.secondary)
                         Spacer()
-                        Button("打开登录项设置") { model.openLoginItems?() }
+                        Button("登录项设置") { model.openLoginItems?() }
                     }
                 }
             }
-            Section("状态") {
-                LabeledContent("手势引擎", value: model.status.rawValue)
+            Section("按住侧键并拖动") {
+                HStack(spacing: 24) {
+                    Toggle("侧键 1", isOn: model.buttonBinding(3))
+                    Toggle("侧键 2", isOn: model.buttonBinding(4))
+                }
+                Text("两颗侧键共用以下设置，至少保留一颗。")
+                    .font(.caption).foregroundStyle(.secondary)
+                Toggle("左右拖动 · 切换桌面", isOn: model.binding(\.horizontalEnabled))
+                Toggle("上下拖动 · 调度中心 / 应用 Exposé", isOn: model.binding(\.verticalEnabled))
+                Text("向上打开调度中心，向下查看当前应用的所有窗口。")
+                    .font(.caption).foregroundStyle(.secondary)
+                Toggle("反转左右拖动方向", isOn: model.binding(\.horizontalInvert))
+            }
+            Section {
+                DisclosureGroup("调整手感", isExpanded: $feelExpanded) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        Text("横向灵敏度")
+                        Slider(value: model.sensitivityBinding, in: 0...1, step: 0.001)
+                            .accessibilityLabel("横向手势灵敏度")
+                            .accessibilityValue("\(Int(model.config.sensitivity))")
+                        HStack { Text("较低"); Spacer(); Text("较高") }
+                            .font(.caption).foregroundStyle(.secondary)
+                        Text("触发距离")
+                        Slider(value: model.binding(\.deadZone, debounce: true), in: 1...80, step: 1)
+                            .accessibilityLabel("触发距离")
+                            .accessibilityValue("\(Int(model.config.deadZone)) 像素")
+                        HStack { Text("较短"); Spacer(); Text("较长") }
+                            .font(.caption).foregroundStyle(.secondary)
+                    }.padding(.vertical, 6)
+                    Toggle("手势期间保持指针不动", isOn: model.binding(\.freezePointer))
+                    Button("恢复默认手势设置") { model.resetGestureSettings() }
+                }
+            }
+            Section {
+                LabeledContent("状态", value: model.status.displayLabel)
                 HStack {
                     Text("辅助功能权限")
                     Spacer()
-                    Text(PermissionPresentation.accessibility(model.accessibilityGranted, completed: !OnboardingState.needsWelcome()))
-                        .foregroundStyle(model.accessibilityGranted ? Color.secondary : Color.orange)
+                    Text(model.accessibilityGranted ? "已开启" : "未开启").foregroundStyle(.secondary)
                     if !model.accessibilityGranted {
                         Button("打开系统设置") { model.openAccessibility?() }
                     }
                 }
-                HStack {
-                    Text("输入监控权限")
-                    Spacer()
-                    Text(PermissionPresentation.inputMonitoring(model.inputMonitoringGranted))
-                        .foregroundStyle(.secondary)
-                    if !model.inputMonitoringGranted {
-                        Button("打开系统设置") { model.openInputMonitoring?() }
+                if let guidance = model.status.guidance {
+                    HStack {
+                        Text(guidance).font(.callout).foregroundStyle(.secondary)
+                        Spacer()
+                        if model.status == .error || model.status == .recovering {
+                            Button("重新尝试") { model.restartEngine?() }
+                        }
                     }
                 }
-            }
-            if !model.accessibilityGranted {
-                Section {
-                    Text("MacMouseGesture 需要辅助功能权限，才能识别鼠标侧键手势。")
-                        .foregroundStyle(.secondary)
-                    Button("打开系统设置") { model.openAccessibility?() }
+                if let message = UserMessage.display(model.message) {
+                    Text(message).font(.callout).foregroundStyle(.secondary)
                 }
-            }
-            if let message = model.message {
-                Section { Text(message).foregroundStyle(.orange) }
+                Button("设置指引与侧键测试") { model.reopenOnboarding?() }
             }
         }
         .formStyle(.grouped)
-        .padding(12)
-    }
-}
-
-struct GestureSettingsView: View {
-    @ObservedObject var model: AppViewModel
-
-    var body: some View {
-        Form {
-            Section("手势按键") {
-                Toggle("侧键 1", isOn: model.buttonBinding(3))
-                Toggle("侧键 2", isOn: model.buttonBinding(4))
-                Text("至少保留一颗侧键。")
-                    .font(.caption).foregroundStyle(.secondary)
-            }
-            Section("横向手势") {
-                Toggle("切换桌面空间", isOn: model.binding(\.horizontalEnabled))
-                Picker("方向", selection: model.binding(\.horizontalInvert)) {
-                    Text("自然").tag(false)
-                    Text("反向").tag(true)
-                }
-                .pickerStyle(.segmented)
-            }
-            Section("纵向手势") {
-                Toggle("启用纵向手势", isOn: model.binding(\.verticalEnabled))
-                LabeledContent("向上拖动", value: "调度中心")
-                LabeledContent("向下拖动", value: "应用 Exposé")
-            }
-            Section("手感") {
-                VStack(alignment: .leading, spacing: 5) {
-                    Text("灵敏度")
-                    Slider(value: model.sensitivityBinding, in: 0...1, step: 0.001)
-                        .accessibilityLabel("横向手势灵敏度")
-                        .accessibilityValue("\(Int(model.config.sensitivity))")
-                    HStack { Text("较低"); Spacer(); Text("较高") }
-                        .font(.caption).foregroundStyle(.secondary)
-                    Text("控制横向拖动距离与桌面空间切换进度的关系；纵向手感目前固定。")
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-                VStack(alignment: .leading, spacing: 5) {
-                    Text("触发距离")
-                    Slider(value: model.binding(\.deadZone, debounce: true), in: 1...80, step: 1)
-                        .accessibilityLabel("触发距离")
-                        .accessibilityValue("\(Int(model.config.deadZone)) 像素")
-                    HStack { Text("较短"); Spacer(); Text("较长") }
-                        .font(.caption).foregroundStyle(.secondary)
-                    Text("鼠标移动多远后开始识别手势。")
-                        .font(.caption).foregroundStyle(.secondary)
-                }
-                Toggle("手势期间保持指针不动", isOn: model.binding(\.freezePointer))
-                Text("进行手势时，指针不会跟随鼠标移动。")
-                    .font(.caption).foregroundStyle(.secondary)
-            }
-            Section {
-                Button("恢复默认手势设置") { model.resetGestureSettings() }
-            }
-        }
-        .formStyle(.grouped)
-        .padding(12)
+        .padding(6)
     }
 }
 
 struct DiagnosticsView: View {
     @ObservedObject var model: AppViewModel
     @State private var advanced = false
-
-    private var macOSVersion: String {
-        let version = ProcessInfo.processInfo.operatingSystemVersion
-        return version.patchVersion == 0
-            ? "\(version.majorVersion).\(version.minorVersion)"
-            : "\(version.majorVersion).\(version.minorVersion).\(version.patchVersion)"
-    }
-
+    @State private var optionalPermission = false
     var body: some View {
         Form {
-            Section("系统") {
-                LabeledContent("应用版本", value: "\(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.1.6") (\(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "12"))")
-                LabeledContent("macOS", value: macOSVersion)
-                LabeledContent("架构", value: "Apple Silicon")
+            Section("使用手势") {
+                Text("按住已启用的鼠标侧键，再向需要的方向拖动。")
+                GestureMap()
+                Button("打开设置指引") { model.reopenOnboarding?() }
             }
-            Section("状态") {
-                LabeledContent("手势引擎", value: model.status.rawValue)
-                LabeledContent("鼠标输入", value: model.snapshot.eventTap == "enabled" ? "正常" : "未运行")
-                LabeledContent("手势后端", value: model.status == .running ? "正常" : "未运行")
-            }
-            Section("手势统计") {
-                LabeledContent("已开始", value: "\(model.snapshot.started)")
-                LabeledContent("已完成", value: "\(model.snapshot.completed)")
-                LabeledContent("已取消", value: "\(model.snapshot.cancelled)")
-                LabeledContent("进行中", value: "\(model.snapshot.open)")
-                LabeledContent("Event Tap 重启次数", value: "\(model.snapshot.eventTapRestarts)")
-                LabeledContent("投递失败", value: "\(model.snapshot.postFailures)")
-                LabeledContent("序列错误", value: "\(model.snapshot.sequenceErrors)")
-            }
-            Section {
-                DisclosureGroup("高级诊断", isExpanded: $advanced) {
-                    ScrollView {
-                        Text(model.advancedReport)
-                            .font(.system(size: 10, design: .monospaced))
-                            .textSelection(.enabled)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }
-                    .frame(height: 155)
+            Section("遇到问题？") {
+                LabeledContent("当前状态", value: model.status.displayLabel)
+                if !model.accessibilityGranted {
+                    Text("开启辅助功能权限后，MacMouseGesture 才能控制系统手势。")
+                        .foregroundStyle(.secondary)
+                    Button("打开系统设置") { model.openAccessibility?() }
+                }
+                Button("重新尝试运行手势") { model.restartEngine?() }
+                DisclosureGroup("可选输入权限", isExpanded: $optionalPermission) {
+                    Text("输入监控用于额外的鼠标兼容性诊断，不是使用手势的必需权限。")
+                        .font(.callout).foregroundStyle(.secondary)
+                    LabeledContent("输入监控", value: model.inputMonitoringGranted ? "已开启" : "未开启")
+                    Button("打开输入监控设置") { model.openInputMonitoring?() }
                 }
             }
-            Section {
-                Text("分享前请展开高级诊断检查内容；复制和保存会使用同一份脱敏报告。")
-                    .font(.caption).foregroundStyle(.secondary)
+            Section("诊断") {
+                Text("需要反馈问题时，可复制或导出诊断信息。分享前请先查看内容。")
+                    .font(.callout).foregroundStyle(.secondary)
                 HStack {
                     Button("复制诊断信息") { model.copyDiagnostics?() }
-                    Button("保存诊断快照") { model.saveDiagnostics?() }
+                    Button("导出诊断信息…") { model.saveDiagnostics?() }
                 }
-                Divider().padding(.vertical, 5)
-                Button("重新启动手势引擎") { model.restartEngine?() }
-            }
-            if let message = model.message {
-                Section { Text(message).foregroundStyle(.secondary) }
+                DisclosureGroup("查看详细诊断", isExpanded: $advanced) {
+                    ScrollView {
+                        Text(model.advancedReport)
+                            .font(.system(size: 11, design: .monospaced))
+                            .textSelection(.enabled)
+                            .frame(maxWidth: .infinity, alignment: .leading)
+                    }.frame(height: 180)
+                }
+                if let message = UserMessage.display(model.message) {
+                    Text(message).font(.callout).foregroundStyle(.secondary)
+                }
             }
         }
         .formStyle(.grouped)
-        .padding(12)
+        .padding(6)
     }
 }
 
 struct AboutView: View {
+    @State private var showNotices = false
+    private var version: String {
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "—"
+        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "—"
+        return "\(version) (\(build))"
+    }
     var body: some View {
         VStack(spacing: 12) {
             Image(nsImage: NSImage(named: NSImage.applicationIconName) ?? NSImage())
-                .resizable().frame(width: 80, height: 80)
-                .accessibilityHidden(true)
+                .resizable().frame(width: 88, height: 88).accessibilityHidden(true)
             Text("MacMouseGesture").font(.title2.weight(.semibold))
-            Text("版本 \(Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "0.1.6") · Build \(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "12")")
-                .foregroundStyle(.secondary)
-            Text("让普通鼠标拥有类似触控板的 macOS 系统手势。")
-            Text("Early Beta · macOS 27 / Apple Silicon").foregroundStyle(.secondary)
-            Text("macOS: \(ProcessInfo.processInfo.operatingSystemVersionString)").font(.caption)
-            Text("Git Commit: \(Bundle.main.object(forInfoDictionaryKey: "GitCommit") as? String ?? "unknown")")
-                .font(.system(size: 10, design: .monospaced)).textSelection(.enabled)
-            Divider().frame(width: 260)
-            Text("© 2026").font(.caption).foregroundStyle(.secondary)
+            Text(version).foregroundStyle(.secondary)
+            Text("让普通鼠标也能使用类似触控板的系统手势")
+                .font(.callout)
+            Text("Beta · macOS 27 / Apple Silicon").font(.caption).foregroundStyle(.secondary)
+            HStack(spacing: 18) {
+                Link("GitHub 项目", destination: URL(string: "https://github.com/double-u-zw/MacMouseGesture")!)
+                Button("许可与致谢") { showNotices = true }.buttonStyle(.link)
+            }.padding(.top, 8)
+            Text("© 2026 MacMouseGesture").font(.caption).foregroundStyle(.secondary)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .sheet(isPresented: $showNotices) {
+            VStack(alignment: .leading, spacing: 16) {
+                Text("许可与致谢").font(.title2.weight(.semibold))
+                ScrollView {
+                    Text(notices).font(.callout).textSelection(.enabled)
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                HStack { Spacer(); Button("完成") { showNotices = false }.keyboardShortcut(.defaultAction) }
+            }.padding(24).frame(width: 490, height: 390)
+        }
+    }
+    private var notices: String {
+        guard let url = Bundle.main.url(forResource: "THIRD_PARTY_NOTICES", withExtension: "md"),
+              let text = try? String(contentsOf: url, encoding: .utf8) else {
+            return "暂时无法读取随应用提供的许可与致谢文件。"
+        }
+        return text
     }
 }
 
