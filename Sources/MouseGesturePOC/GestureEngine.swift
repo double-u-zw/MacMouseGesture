@@ -70,6 +70,7 @@ final class GestureEngine {
     private let statusLock = NSLock()
     private var statusText = "Stopped — no mouse events consumed"
     var onStatus: (() -> Void)?
+    var onInputDeviceRemoved: (() -> Void)?
     init(log: Diagnostics) { self.log = log; log.log("INFO", backend.status) }
     var status: String { statusLock.lock(); defer { statusLock.unlock() }; return statusText }
     func uiSnapshot() -> EngineUISnapshot {
@@ -174,7 +175,16 @@ final class GestureEngine {
                 // Optional read-only HID observer for removal notification and device identity.
                 if mode.usesGestures && CGPreflightListenEventAccess() {
                     let observer = HIDInputBackend(log: log)
-                    observer.disconnected = { [weak self] in self?.stop("mouse removed") }
+                    observer.disconnected = { [weak self] in
+                        guard let self else { return }
+                        self.queue.async { [weak self] in
+                            guard let self, self.sessionID == generation, self.experiment != nil else { return }
+                            // Finish/cancel the old sequence and release held input first.
+                            // Ignore duplicate removals and callbacks from a retired observer.
+                            self.stopOnQueue("mouse removed")
+                            DispatchQueue.main.async { [weak self] in self?.onInputDeviceRemoved?() }
+                        }
+                    }
                     hid = observer
                     if observer.start() != kIOReturnSuccess { observer.stop(); hid = nil }
                 }

@@ -17,6 +17,32 @@ struct ProductizationTests {
             }
         }
     }
+    func testTechnicalRatiosPreserved() {
+        let text = "pixels/progress=600; sensitivity=1/600; all buttons/motion/scroll"
+        expectEqual(DiagnosticRedactor.redact(text), text)
+        expectEqual(DiagnosticRedactor.redact("path=/custom/private filename.txt"), "path=<PRIVATE_PATH>")
+    }
+    func testDeviceRemovalRecovery() {
+        var state = AutoStartState()
+        expectTrue(state.takeStartIfReady(permissionGranted: true))
+        expectTrue(state.inputDeviceRemoved(at: 0))
+        expectFalse(state.takeStartIfReady(permissionGranted: false))
+        expectTrue(state.takeStartIfReady(permissionGranted: true))
+        expectFalse(state.takeStartIfReady(permissionGranted: true))
+        state.suspend(.sleep)
+        expectTrue(state.inputDeviceRemoved(at: 1))
+        expectFalse(state.takeStartIfReady(permissionGranted: true))
+        state.resume(.sleep)
+        expectTrue(state.takeStartIfReady(permissionGranted: true))
+        expectTrue(state.inputDeviceRemoved(at: 2))
+        expectTrue(state.takeStartIfReady(permissionGranted: true))
+        expectFalse(state.inputDeviceRemoved(at: 3))
+        expectFalse(state.takeStartIfReady(permissionGranted: true))
+        expectTrue(state.inputDeviceRemoved(at: 61))
+        state.stop()
+        expectFalse(state.inputDeviceRemoved(at: 62))
+        expectFalse(state.takeStartIfReady(permissionGranted: true))
+    }
     func testLogBoundary() {
         let log = Diagnostics()
         log.log("ERROR", "startup /Users/alice/Documents/Secret.txt")

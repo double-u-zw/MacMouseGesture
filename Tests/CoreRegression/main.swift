@@ -50,6 +50,8 @@ let presentation = PresentationTests()
 let missionPOC = MissionControlPOCTests()
 let product = ProductizationTests()
 let checks: [(String, () throws -> Void)] = [
+    ("device removal recovers once respecting permission, sleep, stop and retry budget", product.testDeviceRemovalRecovery),
+    ("diagnostic redaction preserves technical ratios", product.testTechnicalRatiosPreserved),
     ("redact Unicode/space/encoded home and private filenames", product.testRedaction),
     ("redact bounded recent logs at collection boundary", product.testLogBoundary),
     ("single instance contention and release", product.testLock),

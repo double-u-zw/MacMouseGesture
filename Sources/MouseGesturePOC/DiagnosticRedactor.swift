@@ -8,7 +8,7 @@ enum DiagnosticRedactor {
         // Drop the remainder of a path-bearing line, including spaces and CJK.
         // This intentionally sacrifices error detail to avoid leaking filenames.
         return decoded.replacingOccurrences(
-            of: #"(?m)(?:file://|~)?/(?=[^\s/])[^\r\n]*"#,
+            of: #"(?m)(?<![A-Za-z0-9_])(?:file://|~)?/(?=[^\s/])[^\r\n]*"#,
             with: "<PRIVATE_PATH>", options: .regularExpression)
     }
     static func installation(_ url: URL = Bundle.main.bundleURL) -> String {

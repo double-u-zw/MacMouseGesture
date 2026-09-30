@@ -69,6 +69,15 @@ final class MacMouseGestureApp: NSObject, NSApplicationDelegate {
         installModelActions()
         installLifecycleObservers()
         engine.onStatus = { [weak self] in self?.update() }
+        engine.onInputDeviceRemoved = { [weak self] in
+            guard let self, self.model.config.shouldRun else { return }
+            if self.automatic.inputDeviceRemoved(at: monotonicTime()) {
+                self.diagnostics.log("INFO", "Mouse removed; scheduling bounded input recovery")
+                self.update()
+            } else {
+                self.model.message = "鼠标连接频繁变化，自动恢复已暂停。连接稳定后请点击“重新启动手势引擎”。"
+            }
+        }
         refresh = Timer.scheduledTimer(withTimeInterval: 1, repeats: true) { [weak self] _ in self?.update() }
         diagnostics.log("INFO", "macOS \(ProcessInfo.processInfo.operatingSystemVersionString); arm64; Beta Preview")
         update()
