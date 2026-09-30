@@ -7,7 +7,7 @@ def verify(bundle):
     with (bundle / 'Contents/Info.plist').open('rb') as f:
         p = plistlib.load(f)
     expected = dict(CFBundleIdentifier='io.github.double-u-zw.macmousegesture', CFBundleExecutable='MacMouseGesture',
-                    CFBundleName='MacMouseGesture', CFBundleIconFile='MacMouseGesture', CFBundleShortVersionString='0.2.0-beta.1', CFBundleVersion='16',
+                    CFBundleName='MacMouseGesture', CFBundleIconFile='MacMouseGesture', CFBundleShortVersionString='0.2.0-beta.1', CFBundleVersion='17',
                     BetaVersion='0.2.0-beta.1', CFBundlePackageType='APPL', LSMinimumSystemVersion='27.0', LSUIElement=True)
     for key, value in expected.items():
         assert p.get(key) == value, f'invalid {key}'
