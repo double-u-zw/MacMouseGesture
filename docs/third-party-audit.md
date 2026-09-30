@@ -1,3 +1,5 @@
+> Historical audit of the pre-Build-15 implementation. Its source classifications and line numbers are preserved as historical evidence. For the replacement implementation and current scope, see [system-gesture-provenance.md](system-gesture-provenance.md) and [Build 15 validation](build15-validation.md). Apple private-interface review remains open.
+
 # 第三方代码与许可审计
 
 日期：2026-09-29。结论：**P0 — 公开源码/二进制前，需要关闭 SystemGestureBridge 的 MMF 衍生性和 Apple 头文件来源复核。**没有给项目添加许可证，没有复制研究仓库进 Git，也没有联系第三方。

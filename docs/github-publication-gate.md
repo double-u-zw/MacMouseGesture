@@ -4,6 +4,8 @@ Date: 2026-09-30. Current branch: `productization/github-beta`. This gate does n
 
 ## Build 15 current gates
 
+Candidate built from `759377a`; 82/82 regression/Bridge checks and 6/6 package fault checks PASS. Signed locally with hardened runtime, not notarized. Hardware acceptance remains pending.
+
 | Gate | Status | Scope |
 |---|---|---|
 | MMF_SOURCE_PROVENANCE | PASS — current tree engineering evidence | Both old constructors removed; specification and behavior-contract replacement. Historical attribution retained; not a legal guarantee or clearance of old Git history. |
