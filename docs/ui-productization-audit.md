@@ -44,3 +44,17 @@ Validation will distinguish automatic tests/compilation from real visual/hardwar
 - Protected implementation files compared to identity completion commit `98bb456`: Bridge, GestureCore, mouse input, HID observation, engine/recovery, single-instance, ProductIdentity migration, LoginItemController, ConfigStore and OnboardingState all unchanged. main.swift UI diff is limited to menu construction/status wording and window size.
 - Hardware smoke (both buttons, Spaces/Mission Control/App Exposé and reconnect) was not performed during this UI pass. Build 15 user acceptance remains the historical core baseline.
 - Manual pages: main settings; welcome; permissions; side-button test; completion; About/acknowledgements; menu bar. Also inspect expanded feel controls and help/diagnostic disclosure. Completion requires actual side-button detection and user gesture confirmation; do not bypass it just to obtain a screenshot.
+
+
+## Final small polish — UI freeze candidate
+
+Only `SettingsView.swift` changed at runtime. About source is byte-identical; menu, window size, onboarding, settings/login bindings, identity and all core sources are unchanged.
+
+- Product icon 48→40 pt, heading spacing 4→2 pt, extra header vertical padding removed. Product heading shares the existing application section, removing one section gap. No font sizes reduced.
+- Vertical gesture toggle reads “上下手势”, with “向上打开调度中心，向下打开应用 Exposé。” directly underneath in the same compact row.
+- Guide button reads “设置向导”; still reopens the entire original onboarding flow.
+- Status rows grouped with 6 pt spacing: “运行状态” and “辅助功能权限”. Outer vertical padding removed; normal status remains plain text.
+- Help uses “更多权限” and “诊断与反馈”. Only copy is immediately visible; export and the independently collapsed detailed report are inside “更多诊断选项”. No diagnostic capability removed.
+- Complete regression: **77 + 15 = 92/92 PASS**; isolated compilation PASS.
+- Native UI tool still resolves the installed path as the old ID, so visual/folding interaction is not claimed as automatically verified. Final owner checks: main controls visible without excessive scrolling; Help opens and both nested disclosures expand; About/onboarding unchanged; login and setting persistence still work. No synthetic gesture smoke or physical input claimed.
+- Freeze status: implementation complete, awaiting owner confirmation of Settings and Help; no additional redesign planned.
