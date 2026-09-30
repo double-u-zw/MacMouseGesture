@@ -21,16 +21,15 @@ struct SettingsView: View {
 
 struct ProductHeading: View {
     var body: some View {
-        HStack(spacing: 12) {
+        HStack(spacing: 10) {
             Image(nsImage: NSImage(named: NSImage.applicationIconName) ?? NSImage())
-                .resizable().frame(width: 48, height: 48).accessibilityHidden(true)
-            VStack(alignment: .leading, spacing: 4) {
+                .resizable().frame(width: 40, height: 40).accessibilityHidden(true)
+            VStack(alignment: .leading, spacing: 2) {
                 Text("MacMouseGesture").font(.title2.weight(.semibold))
                 Text("让普通鼠标也能使用类似触控板的系统手势")
                     .font(.callout).foregroundStyle(.secondary)
             }
         }
-        .padding(.vertical, 4)
     }
 }
 
@@ -50,8 +49,8 @@ struct GeneralSettingsView: View {
     @State private var feelExpanded = false
     var body: some View {
         Form {
-            Section { ProductHeading() }
             Section {
+                ProductHeading()
                 Toggle("启用 MacMouseGesture", isOn: model.binding(\.enabled))
                 Toggle("登录时启动", isOn: Binding(
                     get: { model.loginState.isSelected }, set: { model.setLoginEnabled?($0) }))
@@ -71,9 +70,11 @@ struct GeneralSettingsView: View {
                 Text("两颗侧键共用以下设置，至少保留一颗。")
                     .font(.caption).foregroundStyle(.secondary)
                 Toggle("左右拖动 · 切换桌面", isOn: model.binding(\.horizontalEnabled))
-                Toggle("上下拖动 · 调度中心 / 应用 Exposé", isOn: model.binding(\.verticalEnabled))
-                Text("向上打开调度中心，向下查看当前应用的所有窗口。")
-                    .font(.caption).foregroundStyle(.secondary)
+                VStack(alignment: .leading, spacing: 3) {
+                    Toggle("上下手势", isOn: model.binding(\.verticalEnabled))
+                    Text("向上打开调度中心，向下打开应用 Exposé。")
+                        .font(.caption).foregroundStyle(.secondary)
+                }
                 Toggle("反转左右拖动方向", isOn: model.binding(\.horizontalInvert))
             }
             Section {
@@ -97,13 +98,15 @@ struct GeneralSettingsView: View {
                 }
             }
             Section {
-                LabeledContent("状态", value: model.status.displayLabel)
-                HStack {
-                    Text("辅助功能权限")
-                    Spacer()
-                    Text(model.accessibilityGranted ? "已开启" : "未开启").foregroundStyle(.secondary)
-                    if !model.accessibilityGranted {
-                        Button("打开系统设置") { model.openAccessibility?() }
+                VStack(spacing: 6) {
+                    LabeledContent("运行状态", value: model.status.displayLabel)
+                    HStack {
+                        Text("辅助功能权限")
+                        Spacer()
+                        Text(model.accessibilityGranted ? "已开启" : "未开启").foregroundStyle(.secondary)
+                        if !model.accessibilityGranted {
+                            Button("打开系统设置") { model.openAccessibility?() }
+                        }
                     }
                 }
                 if let guidance = model.status.guidance {
@@ -118,16 +121,17 @@ struct GeneralSettingsView: View {
                 if let message = UserMessage.display(model.message) {
                     Text(message).font(.callout).foregroundStyle(.secondary)
                 }
-                Button("设置指引与侧键测试") { model.reopenOnboarding?() }
+                Button("设置向导") { model.reopenOnboarding?() }
             }
         }
         .formStyle(.grouped)
-        .padding(6)
+        .padding(.horizontal, 4)
     }
 }
 
 struct DiagnosticsView: View {
     @ObservedObject var model: AppViewModel
+    @State private var moreDiagnostics = false
     @State private var advanced = false
     @State private var optionalPermission = false
     var body: some View {
@@ -145,27 +149,27 @@ struct DiagnosticsView: View {
                     Button("打开系统设置") { model.openAccessibility?() }
                 }
                 Button("重新尝试运行手势") { model.restartEngine?() }
-                DisclosureGroup("可选输入权限", isExpanded: $optionalPermission) {
+                DisclosureGroup("更多权限", isExpanded: $optionalPermission) {
                     Text("输入监控用于额外的鼠标兼容性诊断，不是使用手势的必需权限。")
                         .font(.callout).foregroundStyle(.secondary)
                     LabeledContent("输入监控", value: model.inputMonitoringGranted ? "已开启" : "未开启")
                     Button("打开输入监控设置") { model.openInputMonitoring?() }
                 }
             }
-            Section("诊断") {
-                Text("需要反馈问题时，可复制或导出诊断信息。分享前请先查看内容。")
+            Section("诊断与反馈") {
+                Text("遇到问题时，可生成诊断信息用于反馈。")
                     .font(.callout).foregroundStyle(.secondary)
-                HStack {
-                    Button("复制诊断信息") { model.copyDiagnostics?() }
+                Button("复制诊断信息") { model.copyDiagnostics?() }
+                DisclosureGroup("更多诊断选项", isExpanded: $moreDiagnostics) {
                     Button("导出诊断信息…") { model.saveDiagnostics?() }
-                }
-                DisclosureGroup("查看详细诊断", isExpanded: $advanced) {
-                    ScrollView {
-                        Text(model.advancedReport)
-                            .font(.system(size: 11, design: .monospaced))
-                            .textSelection(.enabled)
-                            .frame(maxWidth: .infinity, alignment: .leading)
-                    }.frame(height: 180)
+                    DisclosureGroup("查看详细诊断", isExpanded: $advanced) {
+                        ScrollView {
+                            Text(model.advancedReport)
+                                .font(.system(size: 11, design: .monospaced))
+                                .textSelection(.enabled)
+                                .frame(maxWidth: .infinity, alignment: .leading)
+                        }.frame(height: 180)
+                    }
                 }
                 if let message = UserMessage.display(model.message) {
                     Text(message).font(.callout).foregroundStyle(.secondary)
