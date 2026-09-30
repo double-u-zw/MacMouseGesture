@@ -1,3 +1,19 @@
+# Current pre-publication gate — cleaned public branch
+
+- CORE_GESTURES = PASS (user acceptance; frozen)
+- UI = PASS (owner declared UI Freeze)
+- MMF = PASS (current implementation engineering provenance; historical acknowledgement retained)
+- BUNDLE_ID = PASS
+- GIT_HISTORY_PRIVACY = PASS (only cleaned `productization/github-beta` ancestry; original local refs excluded)
+- APPLE_PRIVATE_API = OWNER_DECISION
+- SIGNING_NOTARIZATION = OWNER_DECISION
+
+See [privacy scope and backup boundaries](git-history-privacy-audit.md). Publish neither backup/main/stable-tag original history nor all refs. No push, tag, visibility change or Release is authorized. Final packaging after UI freeze/history rewrite is **FINAL_ARTIFACT_PENDING**; project-wide licence selection also remains outstanding.
+
+---
+
+## Historical gate records (superseded where stated above)
+
 # Build 16 identity migration gate
 
 Build 15 core gestures: user hardware acceptance PASS. Current identity migration adopts `io.github.double-u-zw.macmousegesture`; tests 89/89 PASS. Build 16 packaging/installation acceptance is recorded in [migration report](build16-identity-migration.md). No publishing is authorized.
