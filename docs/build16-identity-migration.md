@@ -39,3 +39,22 @@ About/version; permission grant if required; visible retained settings; login st
 ## API references
 
 Apple [persistentDomain(forName:)](https://developer.apple.com/documentation/foundation/userdefaults/persistentdomain(forname:)) documents reading only the named persistent domain. Apple [SMAppService.mainApp](https://developer.apple.com/documentation/servicemanagement/smappservice/mainapp) identifies registration with the main application. These references do not imply TCC authorization inheritance.
+
+## Completed identity candidate validation
+
+- Result: BUNDLE_ID_MIGRATION_PASS (engineering/installation scope).
+- Source commit: `8ee2a978a7b9b6a63b2e8f7c49abd59edd87a0f1`; identity implementation `6064643`.
+- Artifact directory: `<project-root>/build/beta-preview/0.2.0-beta.1-build16-8ee2a978a7b9b6a63b2e8f7c49abd59edd87a0f1/`.
+- App: `MacMouseGesture.app`; DMG: `MacMouseGesture-0.2.0-beta.1-build16.dmg`, 2,304,875 bytes.
+- SHA256: `39dacf0190a1cbaa5f37e91bac2512f949960dc51dc3de23e53dabf233820b09`.
+- Exact committed archive rerun: 89/89 tests PASS; package fault checks **8/8 PASS**.
+- arm64, strict signature, permanent signing identifier, hardened runtime, DMG verification/mount and dSYM UUID matching PASS. Existing local certificate; no Developer ID or notarization.
+- Installed at `/Applications/MacMouseGesture.app`; process executable confirmed from that path (PID 50211 at verification). Plist matches permanent ID, 0.2.0-beta.1, Build 16.
+- LEGACY_SETTINGS_MIGRATION=PASS: actual eight config values and onboarding completion match pre-upgrade snapshot; new migration marker=true, legacy domain unchanged.
+- SINGLE_INSTANCE=PASS: attempted launch of another Build 16 path and legacy Build 15 both exited successfully; installed PID remained the only instance.
+- LOGIN_ITEM_MIGRATION=PASS for current registration: old switch disabled through Build 15; user confirmed new switch enabled. System readback: legacy registration disabled, permanent registration enabled, same /Applications URL; one active entry. Disabled historical system record is retained, not forcibly deleted. Actual next-login launch remains manual.
+- ACCESSIBILITY_REAUTH_REQUIRED=MANUAL_CHECK. Probe output is not treated as proof of GUI process authorization; no TCC action taken.
+- Original Build 15 source app/DMG retained and installed Build 15 backed up locally before replacement. No history rewrite, tag, release or push.
+- Identity source audit: only ProductIdentity (new), main launch/activation wiring and compatibility comments in SingleInstance changed; Bridge, gesture state machines, input/recovery implementation and login controller unchanged.
+
+User then requested UI productization while identity installation was finishing. That work is separate and must not mutate the migration/gesture/login implementation. Identity candidate above remains an immutable Build 16 artifact; later UI builds have separate source revisions/output directories.

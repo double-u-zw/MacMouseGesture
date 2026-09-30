@@ -2,7 +2,7 @@
 
 2026-09-30. Owner fixed `CURRENT_PRODUCT_ID = io.github.double-u-zw.macmousegesture`.
 `LEGACY_PRODUCT_ID = local.macmousegesture.poc`; Build 15 records remain historical.
-This inventory was written before implementation, following code/metadata/script scans.
+This inventory was written before implementation, following code/metadata/script scans. Implementation and real installation now PASS; see [Build 16 results](build16-identity-migration.md). The old login registration is disabled and the new registration enabled; one active entry.
 
 | Dependency | Old ID used? | Migration impact | Required action |
 |---|---|---|---|

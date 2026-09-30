@@ -5,7 +5,7 @@ Build 15 core gestures: user hardware acceptance PASS. Current identity migratio
 - CORE_GESTURES = PASS (Build 15 user acceptance; implementation frozen)
 - MMF_SOURCE_PROVENANCE = PASS (current engineering scope)
 - MMF_BINARY_LICENSE = CLOSED (current replacement source; historical limitations retained)
-- BUNDLE_ID = PENDING_BUILD16_INSTALLATION
+- BUNDLE_ID = PASS (identity candidate installed; settings and shared lock verified)
 - GIT_HISTORY_PRIVACY = OWNER_DECISION
 - APPLE_PRIVATE_API = OWNER_DECISION
 - SIGNING_NOTARIZATION = OWNER_DECISION
