@@ -54,6 +54,23 @@ final class GestureEngine {
     private var previousInput = InputCounters()
     private var recoveryBudget = TapRecoveryBudget()
     private let performance = PerformanceSampler()
+    private var clicks = SideButtonClickTracker()
+    private var pressContexts = MousePressContexts()
+    private let inputRecorder: MouseInputRecorder?
+    private var mappings = MouseMappingStore()
+    private var standaloneClicks = StandaloneShortPressTracker()
+    private lazy var longPresses: LongPressCoordinator = {
+        let value = LongPressCoordinator(scheduler: DispatchLongPressScheduler(queue: queue, clock: monotonicTime))
+        value.onDeadline = { [weak self] number, generation in self?.longPressDeadline(number, generation: generation) }
+        return value
+    }()
+    private var configuredButtons: Set<Int> = []
+    private var dragButtons: Set<Int> = []
+    private var dragDelivery = LegacyDragDelivery(config: .defaults)
+    private lazy var actionExecutor = MouseButtonActionExecutor(
+        verticalAvailable: { [unowned self] in self.backend.probeVertical().available },
+        postVertical: { [unowned self] in self.backend.sendVertical($0) },
+        diagnostic: { [unowned self] in self.log.log("DEBUG", $0) }, gestureQueue: queue)
     private var machine = GestureMachine()
     private var verticalGesture = VerticalGestureTracker()
     private var horizontalEnabled = false
@@ -67,11 +84,14 @@ final class GestureEngine {
     private var lastPermissionCheck = 0.0
     private var lastTrace = 0.0
     private var sessionID = 0
+    private var pressEpoch: UInt64 = 0
     private let statusLock = NSLock()
     private var statusText = "Stopped — no mouse events consumed"
     var onStatus: (() -> Void)?
     var onInputDeviceRemoved: (() -> Void)?
-    init(log: Diagnostics) { self.log = log; log.log("INFO", backend.status) }
+    init(log: Diagnostics, inputRecorder: MouseInputRecorder? = nil) {
+        self.log = log; self.inputRecorder = inputRecorder; log.log("INFO", backend.status)
+    }
     var status: String { statusLock.lock(); defer { statusLock.unlock() }; return statusText }
     func uiSnapshot() -> EngineUISnapshot {
         queue.sync {
@@ -108,7 +128,7 @@ final class GestureEngine {
         DispatchQueue.main.async { [weak self] in self?.onStatus?() }
     }
     func start(_ mode: Experiment, buttons: Set<Int>, freeze: Bool,
-               config: GestureConfig, horizontalEnabled: Bool = true) {
+               config: GestureConfig, horizontalEnabled: Bool = true, clickConfig: AppConfig = .defaults) {
         queue.async { [self] in
             stopOnQueue("restart")
             guard !buttons.isEmpty, buttons.allSatisfy({ (2...31).contains($0) }) else {
@@ -117,12 +137,13 @@ final class GestureEngine {
             let buttonList = buttons.sorted().map(String.init).joined(separator: ",")
             let requestedHorizontal = mode.usesGestures && horizontalEnabled
             let requestedVertical = mode == .missionControlPOC || (mode == .horizontal && config.verticalEnabled)
-            guard !mode.usesGestures || requestedHorizontal || requestedVertical else {
+            let mappingSnapshot = clickConfig.mappingStore
+            guard !mode.usesGestures || requestedHorizontal || requestedVertical || !mappingSnapshot.pressCGButtons.isEmpty else {
                 setStatus("请至少启用一种手势。"); return
             }
             var allowVertical = requestedVertical
             if mode.usesGestures {
-                guard backend.available else {
+                guard !(requestedHorizontal || requestedVertical) || backend.available else {
                     log.log("ERROR", "Interactive backend unavailable: \(backend.status)")
                     setStatus("无法启动：交互式后端不可用。\(backend.status)")
                     return
@@ -143,6 +164,10 @@ final class GestureEngine {
                     }
                 }
             }
+            mappings = mappingSnapshot
+            dragDelivery = LegacyDragDelivery(config: clickConfig)
+            dragButtons = requestedHorizontal || requestedVertical ? buttons : []
+            configuredButtons = mode.usesGestures ? dragButtons.union(mappingSnapshot.pressCGButtons) : buttons
             experiment = mode; sessionID += 1
             self.horizontalEnabled = requestedHorizontal
             self.verticalEnabled = allowVertical
@@ -158,7 +183,11 @@ final class GestureEngine {
                     stopOnQueue("HID open failed; check Input Monitoring"); return
                 }
             } else {
-                let box = InputMailbox(buttons: buttons, gesture: mode.usesGestures, freeze: freeze)
+                let box = InputMailbox(buttons: configuredButtons, gesture: mode.usesGestures, freeze: freeze, gestureButtons: dragButtons, recorder: inputRecorder,
+                                       wheelButtons: mappingSnapshot.wheelCGButtons)
+                let wheelHandoff = WheelInputHandoff(queue: queue, prepare: { [weak self] in self?.drainInput() },
+                    resolve: { [weak self] sample, time in self?.resolveWheel(sample, at: time) ?? false })
+                box.wheelCapture = { sample, time in wheelHandoff.capture(sample, at: time) }
                 let source = DispatchSource.makeUserDataAddSource(queue: queue)
                 let generation = sessionID
                 source.setEventHandler { [weak self] in
@@ -202,7 +231,17 @@ final class GestureEngine {
         }
     }
     func stop(_ reason: String = "user stop") { queue.async { [weak self] in self?.stopOnQueue(reason) } }
+    func cancelPendingClicks() {
+        queue.async { [weak self] in
+            guard let self else { return }
+            self.pressEpoch &+= 1
+            self.longPresses.cancelAll()
+            self.clicks.reset(); self.standaloneClicks.reset(); self.pressContexts.reset()
+            if self.experiment?.usesGestures == true && !self.machine.active { self.timer?.cancel(); self.timer = nil }
+        }
+    }
     func shutdown() { queue.sync { stopOnQueue("application exit") } }
+    func pauseForInputRecording() { queue.sync { stopOnQueue("mouse input recording") } }
 
     private func startTimer(interval: Double) {
         guard timer == nil else { return }
@@ -213,14 +252,66 @@ final class GestureEngine {
     }
     private func drainInput() {
         guard let mailbox else { return }
+        let generation = sessionID
+        let pressGeneration = pressEpoch
+        var releasedLongActions: [(Int, MouseAction)] = []
         for record in mailbox.drain() {
             guard experiment != nil else { return }
             switch record {
-            case .button(let number, let down, _):
-                log.log("DEBUG", "\(MouseButton(cgNumber: number).name) \(down ? "DOWN" : "UP") cg=\(number)")
+            case .buttonContext(let number, let modifiers):
+                pressContexts.down(number, modifiers: modifiers)
+            case .button(let number, let down, let time):
+                if experiment?.usesGestures == true && configuredButtons.contains(number) {
+                    if down {
+                        if [.longPress, .wheel, .cancelled].contains(longPresses.claim(for: number)) { continue }
+                        pressContexts.down(number)
+                        actionExecutor.cancelMissionControl(reason: "new physical side-button press")
+                        actionExecutor.cancelAppExpose(reason: "new physical side-button press")
+                        if dragButtons.contains(number) {
+                            dragDelivery.down(number)
+                            clicks.down(number, machine: machine)
+                        }
+                        else {
+                            standaloneClicks.down(number, at: time, config: machine.config, sharedMachine: machine)
+                            startTimer(interval: 1.0 / 120)
+                        }
+                        if let identifier = MouseButtonIdentifier(rawValue: number) {
+                            let modifiers = pressContexts.values[number] ?? []
+                            longPresses.down(number, at: time, modifiers: modifiers,
+                                action: mappings.longPressAction(for: identifier.input, modifiers: modifiers),
+                                dragClaimed: clicks.states[number] == .gestureStarted || standaloneClicks.dragStartedButtons.contains(number),
+                                wheelActions: mappings.wheelActions(for: identifier.input, modifiers: modifiers))
+                        }
+                    }
+                    else {
+                        dragDelivery.up(number)
+                        let modifiers = pressContexts.up(number)
+                        clicks.observe(machine)
+                        standaloneClicks.observeShared(machine)
+                        observeLongPressDrag()
+                        let resolution = longPresses.release(number, at: time)
+                        if case .longPress(let action) = resolution { releasedLongActions.append((number, action)) }
+                        let state = clicks.states[number]
+                        let accepted = dragButtons.contains(number) ? clicks.up(number) : standaloneClicks.up(number)
+                        if accepted && resolution == .shortPressAllowed {
+                            if let identifier = MouseButtonIdentifier(rawValue: number),
+                               let action = mappings.shortPressAction(for: identifier.input, modifiers: modifiers) {
+                                log.log("DEBUG", "[Mapping] button=\(identifier.number) modifiers=\(modifiers.rawValue) trigger=shortPress action=\(action.title)")
+                                if !actionExecutor.execute(action, button: identifier.number) {
+                                    log.log("WARN", "Short-click action failed for CG button \(number)")
+                                }
+                            }
+                        } else {
+                            log.log("DEBUG", "Short-click suppressed cg=\(number) reason=\(state == .gestureStarted ? "gesture" : "cancelled/unmatched")")
+                        }
+                        if !dragButtons.contains(number) && !standaloneClicks.isActive && !machine.active { timer?.cancel(); timer = nil }
+                    }
+                }
+                log.log("DEBUG", "\(MouseButtonIdentifier(rawValue: number)?.title ?? "invalid button") \(down ? "DOWN" : "UP") cg=\(number)")
             case .modifier(let down, let time):
                 if experiment?.usesGestures == true {
                     if down {
+                        dragDelivery.begin()
                         machine.down(at: time)
                         if verticalEnabled { verticalGesture.down(at: time) }
                         startTimer(interval: 1.0 / 120)
@@ -234,13 +325,27 @@ final class GestureEngine {
                         }
                         let horizontalFrames = machine.finish(at: time)
                         if horizontalEnabled { send(horizontalFrames) }
+                        dragDelivery.end()
                         reportGesture(at: time)
-                        timer?.cancel(); timer = nil
+                        if !standaloneClicks.isActive { timer?.cancel(); timer = nil }
                     }
                 }
             case .motion(let x, let y, let time, let count):
                 if experiment?.usesGestures == true {
-                    machine.move(dx: x, dy: y, at: time, count: count)
+                    // A long owner has retired its click tracker. Buffered motion
+                    // must not start a drag while its physical-up edge is in flight.
+                    // With no long lifecycle, this is exactly the original path.
+                    if !longPresses.isActive || !clicks.states.isEmpty {
+                        machine.move(dx: x, dy: y, at: time, count: count)
+                    }
+                    standaloneClicks.move(dx: x, dy: y, at: time, count: count)
+                    standaloneClicks.observeShared(machine)
+                    clicks.observe(machine)
+                    observeLongPressDrag()
+                    if clicks.states.values.contains(.gestureStarted) {
+                        actionExecutor.cancelMissionControl(reason: "physical drag takes priority")
+                        actionExecutor.cancelAppExpose(reason: "physical drag takes priority")
+                    }
                     if verticalEnabled { verticalGesture.move(totalY: machine.totalY, at: time) }
                 }
                 else { log.log("TRACE", String(format: "CG moved/dragged dx=%.1f dy=%.1f rawEvents=%d", x, y, count)) }
@@ -249,8 +354,77 @@ final class GestureEngine {
             case .cancel(let reason):
                 stopOnQueue(reason); return
             case .tapDisabled(let reason):
+                releasedLongActions.removeAll()
                 recoverTap(reason)
             }
+        }
+        // On a delayed dispatch callback, a release at/after the deadline still
+        // claims long press. Finish queued gesture-up edges before executing it.
+        if experiment?.usesGestures == true && sessionID == generation && pressEpoch == pressGeneration {
+            for (number, action) in releasedLongActions { executeLongPress(action, number: number) }
+        }
+    }
+    private func observeLongPressDrag() {
+        guard longPresses.isActive else { return }
+        let dragged: Set<Int> = Set(clicks.states.filter { $0.value == .gestureStarted }.keys)
+        longPresses.observeDrag(dragged.union(standaloneClicks.dragStartedButtons))
+    }
+    private func resolveWheel(_ sample: WheelScrollSample, at time: Double) -> Bool {
+        guard experiment?.usesGestures == true else { return false }
+        observeLongPressDrag()
+        let resolution = longPresses.wheel(sample, at: time)
+        guard resolution.consumed else { return false }
+        if resolution.newlyClaimed, let number = resolution.button {
+            dragDelivery.retire(number)
+            _ = clicks.up(number); _ = standaloneClicks.up(number)
+            if mailbox?.retirePressDriver(number, at: time) == true {
+                // Finish only the unclaimed detecting pipeline. No core drag math changes.
+                if verticalEnabled { _ = verticalGesture.finish(verticalLocked: false, at: time) }
+                _ = machine.finish(at: time)
+            }
+            if !machine.active && !standaloneClicks.isActive { timer?.cancel(); timer = nil }
+        }
+        if let action = resolution.action, let number = resolution.button {
+            let generation = sessionID, epoch = pressEpoch
+            // Posting is asynchronous and outside the tap's decision handoff.
+            queue.async { [weak self] in
+                guard let self, self.experiment?.usesGestures == true, self.sessionID == generation, self.pressEpoch == epoch,
+                      let identifier = MouseButtonIdentifier(rawValue: number) else { return }
+                self.log.log("DEBUG", "[Mapping] button=\(identifier.number) trigger=wheel direction=\(sample.direction?.rawValue ?? "unknown") action=\(action.title)")
+                if !self.actionExecutor.execute(action, button: identifier.number) {
+                    self.log.log("WARN", "Wheel action failed for CG button \(number)")
+                }
+            }
+        }
+        return true
+    }
+    private func longPressDeadline(_ number: Int, generation: UInt64) {
+        // Edges/motion received before this callback get the first opportunity
+        // to claim/cancel. A stale callback cannot act on a newer press.
+        drainInput()
+        guard experiment?.usesGestures == true else { return }
+        observeLongPressDrag()
+        guard let action = longPresses.fire(number, generation: generation) else { return }
+        let pressGeneration = pressEpoch
+        dragDelivery.retire(number)
+        _ = clicks.up(number); _ = standaloneClicks.up(number)
+        let now = monotonicTime()
+        if mailbox?.claimLongPress(number, at: now) == true {
+            // The tap can buffer new motion while this callback runs. Retire the
+            // detecting pipeline now, so such motion cannot enter drag afterward.
+            if verticalEnabled { _ = verticalGesture.finish(verticalLocked: false, at: now) }
+            _ = machine.finish(at: now)
+        }
+        drainInput() // retire the existing logical drag driver before the action
+        guard experiment?.usesGestures == true, pressEpoch == pressGeneration else { return }
+        if !machine.active && !standaloneClicks.isActive { timer?.cancel(); timer = nil }
+        executeLongPress(action, number: number)
+    }
+    private func executeLongPress(_ action: MouseAction, number: Int) {
+        guard let identifier = MouseButtonIdentifier(rawValue: number) else { return }
+        log.log("DEBUG", "[Mapping] button=\(identifier.number) trigger=longPress action=\(action.title)")
+        if !actionExecutor.execute(action, button: identifier.number) {
+            log.log("WARN", "Long-press action failed for CG button \(number)")
         }
     }
     private func startHealthMonitor() {
@@ -270,6 +444,13 @@ final class GestureEngine {
         monitor.resume(); healthTimer = monitor
     }
     private func recoverTap(_ reason: String) {
+        actionExecutor.cancelMissionControl(reason: reason)
+        actionExecutor.cancelAppExpose(reason: reason)
+        pressEpoch &+= 1
+        longPresses.reset()
+        clicks.reset()
+        standaloneClicks.reset()
+        pressContexts.reset()
         log.log("WARN", reason)
         // Terminate the old gesture once. A held key is quarantined by the mailbox
         // until its release; resuming the tap never resumes its old accumulator.
@@ -280,6 +461,7 @@ final class GestureEngine {
         }
         let horizontalFrames = machine.finish(at: now, cancel: true)
         if horizontalEnabled { send(horizontalFrames) }
+        dragDelivery.reset()
         timer?.cancel(); timer = nil
         guard experiment != nil else { return }
         guard (experiment?.usesGestures != true || AXIsProcessTrusted()), recoveryBudget.take(at: monotonicTime()) else {
@@ -297,7 +479,7 @@ final class GestureEngine {
         drainInput()
         guard experiment?.usesGestures == true else { return }
         let now = monotonicTime()
-        if machine.active && now - machine.startTime > 20 {
+        if (machine.active && now - machine.startTime > 20) || standaloneClicks.oldestStart.map({ now - $0 > 20 }) == true {
             stopOnQueue("20-second held-button safety limit"); return
         }
         if now - lastPermissionCheck > 1 {
@@ -328,8 +510,13 @@ final class GestureEngine {
         log.log("DEBUG", String(format: "axis locked: vertical; rawDy=%.1f; action=%@",
                                 verticalGesture.rawY, verticalGesture.action.rawValue))
     }
+    private func deliverable(_ frames: [GestureFrame], axis: PostingAxis) -> [GestureFrame] {
+        let direction: MouseDragDirection = axis == .vertical ?
+            (verticalGesture.action == .missionControl ? .up : .down) : (machine.totalX < 0 ? .left : .right)
+        return dragDelivery.filter(frames, vertical: axis == .vertical, direction: direction)
+    }
     private func send(_ frames: [GestureFrame], axis: PostingAxis = .horizontal) {
-        for frame in frames {
+        for frame in deliverable(frames, axis: axis) {
             let posted = axis == .horizontal ? backend.send(frame) : backend.sendVertical(frame)
             guard posted else {
                 counters.postFailures += 1
@@ -378,21 +565,29 @@ final class GestureEngine {
                                 emitted, Double(machine.rawEvents) / duration))
     }
     private func stopOnQueue(_ reason: String, sendCancel: Bool = true) {
+        actionExecutor.cancelMissionControl(reason: reason)
+        actionExecutor.cancelAppExpose(reason: reason)
+        pressEpoch &+= 1
+        longPresses.reset()
+        clicks.reset()
+        standaloneClicks.reset()
+        pressContexts.reset()
         mailbox?.stop() // Fail open immediately, before doing any more work.
         let now = monotonicTime()
         let verticalTerminal = verticalEnabled
             ? verticalGesture.finish(verticalLocked: verticalAxisLocked(), at: now, cancel: true) : []
         let terminal = machine.finish(at: now, cancel: true)
         if sendCancel {
-            for frame in verticalTerminal {
+            for frame in deliverable(verticalTerminal, axis: .vertical) {
                 if backend.sendVertical(frame) { counters.record(frame) } else { counters.postFailures += 1 }
             }
             if horizontalEnabled {
-                for frame in terminal {
+                for frame in deliverable(terminal, axis: .horizontal) {
                     if backend.send(frame) { counters.record(frame) } else { counters.postFailures += 1 }
                 }
             }
         }
+        dragDelivery.reset()
         timer?.cancel(); timer = nil
         lease?.cancel(); lease = nil
         healthTimer?.cancel(); healthTimer = nil

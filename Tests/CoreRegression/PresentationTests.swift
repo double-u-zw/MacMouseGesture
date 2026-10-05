@@ -17,13 +17,15 @@ struct PresentationTests {
                                        engineStatus: "Stopped"), .disabled)
     }
 
-    func testSideButtonsCannotBecomeEmpty() {
-        let both = AppConfig.defaults
-        let firstOnly = GestureSettings.changingButton(both, number: 4, selected: false)
-        expectEqual(firstOnly?.gestureButtons, Set([3]))
-        expectTrue(GestureSettings.changingButton(firstOnly!, number: 3, selected: false) == nil)
-        expectEqual(GestureSettings.changingButton(firstOnly!, number: 4, selected: true)?.gestureButtons,
-                    Set([3, 4]))
+    func testDragMappingToggleDoesNotDisablePhysicalButton() {
+        let model = AppViewModel()
+        model.applyConfig = { [weak model] next, _ in model?.show(next.validated()) }
+        let before = model.config.mappingStore.mappings
+        let row = before.first { $0.input == .button(4) && $0.trigger == .drag(.left) }!
+        model.setMappingEnabled(false, id: row.id)
+        expectFalse(model.config.mappingStore.mappings.first { $0.id == row.id }!.isEnabled)
+        expectEqual(model.config.mappingStore.mappings.filter { $0.id != row.id }, before.filter { $0.id != row.id })
+        expectTrue(model.config.gestureButtons.contains(3))
     }
 
     func testSliderPositionsRoundTripExistingDefaults() {
@@ -45,14 +47,14 @@ struct PresentationTests {
         model.applyConfig = { [weak model] next, _ in store.save(next); model?.show(next) }
         model.binding(\.enabled).wrappedValue = false
         expectFalse(store.load().enabled)
-        model.buttonBinding(3).wrappedValue = false
-        expectEqual(store.load().gestureButtons, Set([4]))
-        model.buttonBinding(4).wrappedValue = false
-        expectEqual(store.load().gestureButtons, Set([4]))
+        let row = model.config.mappingStore.mapping(for: .button(4), trigger: .drag(.left))!
+        model.setMappingEnabled(false, id: row.id)
+        expectFalse(store.load().mappingStore.mappings.first { $0.id == row.id }!.isEnabled)
+        expectTrue(store.load().mappingStore.mapping(for: .button(4), trigger: .drag(.right))!.isEnabled)
         model.binding(\.horizontalInvert).wrappedValue = false
         expectFalse(ConfigStore(defaults: defaults).load().horizontalInvert)
-        model.binding(\.verticalEnabled).wrappedValue = false
-        expectFalse(ConfigStore(defaults: defaults).load().verticalEnabled)
+        model.binding(\.freezePointer).wrappedValue = false
+        expectFalse(ConfigStore(defaults: defaults).load().freezePointer)
     }
 
     func testLoginStateDoesNotMistakeApprovalForOff() {
@@ -74,9 +76,9 @@ struct PresentationTests {
         changed.freezePointer = false
         let restored = GestureSettings.restoringDefaults(changed)
         expectFalse(restored.enabled)
-        expectEqual(restored.gestureButtons, Set([3, 4]))
-        expectTrue(restored.horizontalEnabled)
-        expectTrue(restored.verticalEnabled)
+        expectEqual(restored.gestureButtons, changed.gestureButtons)
+        expectFalse(restored.horizontalEnabled)
+        expectFalse(restored.verticalEnabled)
         expectTrue(restored.horizontalInvert)
         expectEqual(restored.sensitivity, 600)
         expectEqual(restored.deadZone, 8)

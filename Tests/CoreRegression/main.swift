@@ -2,11 +2,23 @@ import Foundation
 import Darwin
 
 enum CheckError: Error { case skip(String) }
+if CommandLine.arguments.count == 3, ["--write-mapping-fixture", "--read-mapping-fixture"].contains(CommandLine.arguments[1]) {
+    let defaults = UserDefaults(suiteName: CommandLine.arguments[2])!
+    let store = ConfigStore(defaults: defaults)
+    var fixture = AppConfig()
+    fixture.mappings = [MouseMapping(id: UUID(uuidString: "00000000-0000-0000-0000-000000000008")!, input: .button(8), trigger: .shortPress,
+        action: .keyboardShortcut(KeyboardShortcut(keyCode: 17, modifierFlags: KeyboardShortcut.modifierMask)!), isEnabled: false)]
+    if CommandLine.arguments[1] == "--write-mapping-fixture" { store.save(fixture); exit(defaults.synchronize() ? 0 : 1) }
+    exit(store.load() == fixture && store.load().mappingStore.mapping(for: .button(4), trigger: .shortPress) == nil ? 0 : 1)
+}
 if CommandLine.arguments.count == 3, ["--write-config-fixture", "--read-config-fixture"].contains(CommandLine.arguments[1]) {
     let defaults = UserDefaults(suiteName: CommandLine.arguments[2])!
     let store = ConfigStore(defaults: defaults)
     var fixture = AppConfig(); fixture.enabled = false; fixture.deadZone = 17; fixture.sensitivity = 760
     fixture.horizontalInvert = true; fixture.gestureButtons = [4]; fixture.freezePointer = false
+    fixture.button4ClickAction = ButtonClickConfiguration(action: .showDesktop)
+    fixture.button5ClickAction = ButtonClickConfiguration(action: .customShortcut,
+        shortcut: KeyboardShortcut(keyCode: 20, modifierFlags: KeyboardShortcut.modifierMask))
     if CommandLine.arguments[1] == "--write-config-fixture" {
         store.save(fixture)
         // Deterministic test process flush, not required by production UI writes.
@@ -114,7 +126,7 @@ let checks: [(String, () throws -> Void)] = [
     ("bounded recovery + display resume respects stop/sleep", boundary.testRecoveryRateLimitAndDisplayRestartRespectStop),
     ("counters expose orphan and invalid sequences", boundary.testCountersExposeIncompleteOrInvalidSequences),
     ("menu status maps real engine and permission state", presentation.testStatusUsesExistingEngineAndPermissionState),
-    ("side-button settings cannot remove the last button", presentation.testSideButtonsCannotBecomeEmpty),
+    ("drag mapping toggle preserves the physical button", presentation.testDragMappingToggleDoesNotDisablePhysicalButton),
     ("sensitivity slider preserves the confirmed default", presentation.testSliderPositionsRoundTripExistingDefaults),
     ("settings bindings save through the existing config store", presentation.testSettingsBindingUsesExistingConfigStore),
     ("login item approval is distinct from off", presentation.testLoginStateDoesNotMistakeApprovalForOff),
@@ -130,11 +142,12 @@ let checks: [(String, () throws -> Void)] = [
     ("horizontal path stays isolated from vertical POC", missionPOC.testHorizontalPathDoesNotSelectVerticalAction),
     ("vertical HID round-trip; NO event injection", missionPOC.testVerticalHIDRoundTripWithoutPosting)
 ]
-for (name, check) in checks {
+let allChecks = checks + shortClickChecks + missionControlActionChecks + appExposeActionChecks + minimizeWindowActionChecks + fullScreenWindowActionChecks + backMouseActionChecks + mouseMappingChecks + mouseInputRecorderChecks + longPressChecks + longPressLifetimeChecks + wheelTriggerChecks + uiRedesignChecks + uiDragTraceChecks + uiV2Checks + desktopActionChecks
+for (name, check) in allChecks {
     let before = failures
     do { try check(); if failures == before { print("PASS \(name)") } }
     catch CheckError.skip(let reason) { print("SKIP \(name): \(reason)") }
     catch { fail("\(name): \(error)", #filePath, #line) }
 }
-print("\(checks.count) checks, \(failures) failures. No real mouse/Spaces acceptance implied.")
+print("\(allChecks.count) checks, \(failures) failures. No real mouse/Spaces acceptance implied.")
 exit(failures == 0 ? 0 : 1)

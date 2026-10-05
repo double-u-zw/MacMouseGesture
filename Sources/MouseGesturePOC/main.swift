@@ -19,7 +19,10 @@ final class MacMouseGestureApp: NSObject, NSApplicationDelegate {
     // Explicit development entry point; normal launch follows persisted gesture settings.
     private let verticalPOC = CommandLine.arguments.contains("--vertical-poc")
     private let diagnostics = Diagnostics()
-    private lazy var engine = GestureEngine(log: diagnostics)
+    private let recorderGate = MouseInputRecorder()
+    private lazy var mouseRecorder = MouseInputRecorderService(recorder: recorderGate)
+    private var mouseRecorderOpen = false
+    private lazy var engine = GestureEngine(log: diagnostics, inputRecorder: recorderGate)
     private let store = ConfigStore()
     private let loginItem = LoginItemController()
     private lazy var model = AppViewModel()
@@ -85,7 +88,7 @@ final class MacMouseGestureApp: NSObject, NSApplicationDelegate {
         if DiagnosticRedactor.installation() != "Applications" {
             model.message = "建议将 MacMouseGesture 移动到“应用程序”文件夹。"
         }
-        if model.onboardingVisible || !AXIsProcessTrusted() || model.message != nil { showSettings(.general) }
+        if model.onboardingVisible || !AXIsProcessTrusted() || model.message != nil { showSettings(.mappings) }
     }
 
     private func installApplicationMenu() {
@@ -146,6 +149,7 @@ final class MacMouseGestureApp: NSObject, NSApplicationDelegate {
             guard let self, self.model.onboarding.step == .complete else { return }
             self.model.onboarding.persistCompletion()
             self.model.onboardingVisible = false
+            self.model.selectedTab = .mappings
         }
         model.reopenOnboarding = { [weak self] in
             self?.model.onboarding = OnboardingState()
@@ -159,9 +163,28 @@ final class MacMouseGestureApp: NSObject, NSApplicationDelegate {
         model.copyDiagnostics = { [weak self] in self?.copyDiagnostics() }
         model.saveDiagnostics = { [weak self] in self?.saveDiagnostics() }
         model.restartEngine = { [weak self] in self?.restartEngine() }
+        mouseRecorder.onStatus = { [weak self] status in self?.model.mouseRecording = status }
+        model.beginMouseRecording = { [weak self] in
+            guard let self else { return }
+            self.mouseRecorderOpen = true
+            self.engine.pauseForInputRecording()
+            self.mouseRecorder.begin()
+        }
+        model.endMouseRecording = { [weak self] reason in
+            guard let self, self.mouseRecorderOpen else { return }
+            self.mouseRecorderOpen = false
+            self.mouseRecorder.end(reason)
+            if self.model.config.shouldRun { self.automatic.requestStart() }
+            self.update()
+        }
     }
 
     private func installLifecycleObservers() {
+        observers.append(NotificationCenter.default.addObserver(forName: NSApplication.didResignActiveNotification,
+            object: nil, queue: .main) { [weak self] _ in
+                self?.model.endMouseRecording?(.applicationInactive)
+                self?.engine.cancelPendingClicks()
+            })
         let center = NSWorkspace.shared.notificationCenter
         let suspensions: [(Notification.Name, AutoStartState.Suspension)] = [
             (NSWorkspace.willSleepNotification, .sleep),
@@ -172,6 +195,7 @@ final class MacMouseGestureApp: NSObject, NSApplicationDelegate {
             observers.append(center.addObserver(forName: name, object: nil, queue: .main) { [weak self] _ in
                 guard let self else { return }
                 self.automatic.suspend(reason)
+                self.model.endMouseRecording?(.applicationInactive)
                 self.engine.stop("sleep / session inactive")
                 self.update()
             })
@@ -206,9 +230,11 @@ final class MacMouseGestureApp: NSObject, NSApplicationDelegate {
 
     private func makeWindow() -> NSWindow {
         if let window { return window }
-        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 550, height: 620),
-                              styleMask: [.titled, .closable, .miniaturizable], backing: .buffered, defer: false)
+        let window = NSWindow(contentRect: NSRect(x: 0, y: 0, width: 1020, height: 720),
+                              styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
         window.title = "MacMouseGesture 设置"
+        window.minSize = NSSize(width: 930, height: 640)
+        window.tabbingMode = .disallowed
         window.isReleasedWhenClosed = false
         window.isRestorable = false
         window.contentView = NSHostingView(rootView: SettingsView(model: model))
@@ -250,12 +276,12 @@ final class MacMouseGestureApp: NSObject, NSApplicationDelegate {
     private func start(_ experiment: Experiment) {
         engine.start(experiment, buttons: model.config.gestureButtons,
                      freeze: model.config.freezePointer, config: model.config.gestureConfig,
-                     horizontalEnabled: model.config.horizontalEnabled)
+                     horizontalEnabled: model.config.horizontalEnabled, clickConfig: model.config)
     }
 
     private func restartEngine() {
         guard model.config.shouldRun else {
-            model.message = "请先启用 MacMouseGesture 和至少一种手势。"
+            model.message = "请先启用 MacMouseGesture，并设置短按映射或拖动手势。"
             return
         }
         settingDebounce?.invalidate()
@@ -326,12 +352,13 @@ final class MacMouseGestureApp: NSObject, NSApplicationDelegate {
     private func update() {
         let authorized = AXIsProcessTrusted()
         if hadAccessibility && !authorized {
+            model.endMouseRecording?(.applicationInactive)
             engine.stop("Accessibility revoked")
             automatic.requestRestartIfEnabled()
             if !model.onboardingVisible { model.message = "需要重新授权：请前往系统设置 → 隐私与安全性 → 辅助功能。" }
         }
         hadAccessibility = authorized
-        if automatic.takeStartIfReady(permissionGranted: authorized) {
+        if !mouseRecorderOpen && automatic.takeStartIfReady(permissionGranted: authorized) {
             start(verticalPOC ? .missionControlPOC : .horizontal)
         }
         model.accessibilityGranted = authorized
@@ -355,20 +382,21 @@ final class MacMouseGestureApp: NSObject, NSApplicationDelegate {
         apply(next)
     }
     @objc private func toggleLoginFromMenu() { setLogin(!model.loginState.isSelected) }
-    @objc private func openSettingsFromMenu() { showSettings(.general) }
+    @objc private func openSettingsFromMenu() { showSettings(.mappings) }
     @objc private func openDiagnosticsFromMenu() { showSettings(.diagnostics) }
     @objc private func openAboutFromMenu() { showSettings(.about) }
     @objc private func restartFromMenu() { restartEngine() }
 
     func applicationShouldTerminateAfterLastWindowClosed(_ sender: NSApplication) -> Bool { false }
     func applicationShouldHandleReopen(_ sender: NSApplication, hasVisibleWindows flag: Bool) -> Bool {
-        showSettings(.general)
+        showSettings(.mappings)
         return true
     }
     func applicationWillTerminate(_ notification: Notification) {
         settingDebounce?.invalidate()
         automatic.stop()
         refresh?.invalidate()
+        mouseRecorder.shutdown()
         if ownsInstance { engine.shutdown() }
     }
 }

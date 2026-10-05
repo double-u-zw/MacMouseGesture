@@ -64,7 +64,7 @@ struct OnboardingView: View {
                     Button("需要开启权限：打开系统设置") { model.openAccessibility?() }
                 }
                 if !model.config.shouldRun {
-                    Button("前往设置启用手势") { model.onboardingVisible = false; model.selectedTab = .general }
+                    Button("前往鼠标映射") { model.onboardingVisible = false; model.selectedTab = .mappings }
                 }
                 if model.onboarding.detectedSideButton {
                     Label("已检测到侧键", systemImage: "checkmark.circle.fill")

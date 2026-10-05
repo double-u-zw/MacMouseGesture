@@ -3,6 +3,7 @@ import CoreGraphics
 
 enum InputRecord {
     case button(Int, Bool, Double)
+    case buttonContext(Int, MouseModifiers)
     // One logical modifier: first configured button down → last configured button up.
     case modifier(Bool, Double)
     case motion(Double, Double, Double, Int)
@@ -38,20 +39,38 @@ final class InputMailbox {
     private var records: [InputRecord] = []
     private var accepting = true
     private var heldButtons: Set<Int> = []
+    private var retiredPressButtons: Set<Int> = []
+    private var dragHeld: Bool { !heldButtons.subtracting(retiredPressButtons).isDisjoint(with: gestureButtons) }
     private var overflow = false
     private var timing = InputTiming()
     private var counters = InputCounters()
     private var recoveryPending = false
     private var blockedUntilRelease: Set<Int> = []
     let buttons: Set<Int>
+    let gestureButtons: Set<Int>
     let gesture: Bool
     let freeze: Bool
+    let wheelButtons: Set<Int>
+    var wheelCapture: ((WheelScrollSample, Double) -> Bool)?
     var wake: (() -> Void)?
-    init(buttons: Set<Int>, gesture: Bool, freeze: Bool) {
+    private let recorder: MouseInputRecorder?
+    init(buttons: Set<Int>, gesture: Bool, freeze: Bool, gestureButtons: Set<Int>? = nil, recorder: MouseInputRecorder? = nil, wheelButtons: Set<Int> = []) {
         self.buttons = buttons; self.gesture = gesture; self.freeze = freeze
+        self.wheelButtons = wheelButtons
+        self.recorder = recorder
+        self.gestureButtons = gestureButtons ?? buttons
         records.reserveCapacity(256)
     }
     func capture(type: CGEventType, event: CGEvent, receivedAt time: Double = monotonicTime()) -> Bool {
+        // Pass our paired navigation events through, before counters/held-state
+        // handling. They must reach the app without recursively becoming gestures.
+        if MouseActionEventOrigin.isOwnSideButton(type: type, event: event) { return false }
+        if let recorder {
+            switch recorder.capture(type: type, event: event) {
+            case .consume, .captured: return true
+            case .pass, .primaryUnsupported: break
+            }
+        }
         lock.lock()
         guard accepting || recoveryPending else { lock.unlock(); return false }
         if type != .keyDown {
@@ -73,21 +92,26 @@ final class InputMailbox {
         timing.observe(timestamp: event.timestamp, receivedAt: time)
         var consume = false
         var edge = false
+        var resolveWheel = false
         switch type {
         case .otherMouseDown, .otherMouseUp, .leftMouseDown, .leftMouseUp, .rightMouseDown, .rightMouseUp:
             let number = Int(event.getIntegerValueField(.mouseEventButtonNumber))
             let down = type == .otherMouseDown || type == .leftMouseDown || type == .rightMouseDown
+            if down && gesture && buttons.contains(number) {
+                let modifiers = MouseModifiers(flags: event.flags)
+                if !modifiers.isEmpty { records.append(.buttonContext(number, modifiers)) }
+            }
             records.append(.button(number, down, time)); edge = true
             if gesture && buttons.contains(number) {
-                let wasHeld = !heldButtons.isEmpty
-                if down { heldButtons.insert(number) } else { heldButtons.remove(number) }
-                let isHeld = !heldButtons.isEmpty
+                let wasHeld = dragHeld
+                if down { heldButtons.insert(number) } else { heldButtons.remove(number); retiredPressButtons.remove(number) }
+                let isHeld = dragHeld
                 consume = true
                 if wasHeld != isHeld { records.append(.modifier(isHeld, time)) }
             }
         case .mouseMoved, .otherMouseDragged, .leftMouseDragged, .rightMouseDragged:
             let held = !heldButtons.isEmpty
-            consume = gesture && held && freeze && (type == .mouseMoved || type == .otherMouseDragged)
+            consume = gesture && dragHeld && freeze && (type == .mouseMoved || type == .otherMouseDragged)
             if !gesture || held {
                 let dx = Double(event.getIntegerValueField(.mouseEventDeltaX))
                 let dy = Double(event.getIntegerValueField(.mouseEventDeltaY))
@@ -96,7 +120,9 @@ final class InputMailbox {
                 } else { records.append(.motion(dx, dy, time, 1)) }
             }
         case .scrollWheel:
-            if !gesture {
+            if gesture {
+                resolveWheel = !heldButtons.isDisjoint(with: wheelButtons)
+            } else {
                 let x = event.getDoubleValueField(.scrollWheelEventDeltaAxis2)
                 let y = event.getDoubleValueField(.scrollWheelEventDeltaAxis1)
                 if case .scroll(let px, let py, let count) = records.last {
@@ -106,21 +132,39 @@ final class InputMailbox {
         case .keyDown:
             // Only the Escape keycode is inspected, never stored. Always pass keyboard input through.
             if !heldButtons.isEmpty && event.getIntegerValueField(.keyboardEventKeycode) == 53 {
-                heldButtons.removeAll(); accepting = false
+                heldButtons.removeAll(); retiredPressButtons.removeAll(); accepting = false
                 records.append(.cancel("Escape")); edge = true
             }
         default: break
         }
         if records.count > 256 {
             records.removeAll(keepingCapacity: true); records.append(.cancel("mailbox overflow"))
-            overflow = true; accepting = false; heldButtons.removeAll(); consume = false; edge = true
+            overflow = true; accepting = false; heldButtons.removeAll(); retiredPressButtons.removeAll(); consume = false; edge = true
         }
         lock.unlock()
         if edge { wake?() }
+        // Never hold the mailbox lock while the engine drains preceding input.
+        if resolveWheel, let sample = WheelScrollSample(event: event) { return wheelCapture?(sample, time) ?? false }
         return consume
     }
+    // Preserve physical capture through mouseUp, but retire this button as a drag
+    // driver. The existing logical modifier-up finishes the pending pipeline.
+    @discardableResult func claimLongPress(_ number: Int, at time: Double) -> Bool {
+        retirePressDriver(number, at: time)
+    }
+    @discardableResult func retirePressDriver(_ number: Int, at time: Double) -> Bool {
+        lock.lock()
+        guard accepting, heldButtons.contains(number) else { lock.unlock(); return false }
+        let wasHeld = dragHeld
+        retiredPressButtons.insert(number)
+        let isHeld = dragHeld
+        if wasHeld != isHeld { records.append(.modifier(isHeld, time)) }
+        lock.unlock()
+        if wasHeld != isHeld { wake?() }
+        return wasHeld != isHeld
+    }
     func cancel(_ reason: String) {
-        lock.lock(); heldButtons.removeAll()
+        lock.lock(); heldButtons.removeAll(); retiredPressButtons.removeAll()
         if accepting { records.append(.cancel(reason)) }
         accepting = false
         recoveryPending = false
@@ -130,7 +174,7 @@ final class InputMailbox {
         lock.lock()
         guard accepting else { lock.unlock(); return }
         blockedUntilRelease.formUnion(heldButtons)
-        heldButtons.removeAll(); accepting = false; recoveryPending = true
+        heldButtons.removeAll(); retiredPressButtons.removeAll(); accepting = false; recoveryPending = true
         records.append(.tapDisabled(reason))
         lock.unlock(); wake?()
     }
@@ -144,7 +188,7 @@ final class InputMailbox {
         lock.lock(); defer { lock.unlock() }
         let result = records; records.removeAll(keepingCapacity: true); return result
     }
-    func stop() { lock.lock(); accepting = false; recoveryPending = false; heldButtons.removeAll(); lock.unlock() }
+    func stop() { lock.lock(); accepting = false; recoveryPending = false; heldButtons.removeAll(); retiredPressButtons.removeAll(); lock.unlock() }
     func counts() -> InputCounters { lock.lock(); defer { lock.unlock() }; return counters }
     func stats() -> String {
         lock.lock(); defer { lock.unlock() }

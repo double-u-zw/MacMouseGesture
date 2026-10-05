@@ -34,22 +34,12 @@ enum GestureSettings {
     static func restoringDefaults(_ config: AppConfig) -> AppConfig {
         var next = config
         let defaults = AppConfig.defaults
-        next.gestureButtons = defaults.gestureButtons
-        next.horizontalEnabled = defaults.horizontalEnabled
-        next.verticalEnabled = defaults.verticalEnabled
         next.horizontalInvert = defaults.horizontalInvert
         next.sensitivity = defaults.sensitivity
         next.deadZone = defaults.deadZone
         next.freezePointer = defaults.freezePointer
         return next
     }
-    static func changingButton(_ config: AppConfig, number: Int, selected: Bool) -> AppConfig? {
-        guard number == 3 || number == 4 else { return nil }
-        var next = config
-        if selected { next.gestureButtons.insert(number) } else { next.gestureButtons.remove(number) }
-        return next.gestureButtons.isEmpty ? nil : next
-    }
-
     // Logarithmic mapping keeps the confirmed 600 setting near the middle and
     // preserves every existing stored sensitivity value in the 100...5000 range.
     static func sensitivityPosition(for value: Double) -> Double {
