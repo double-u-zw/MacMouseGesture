@@ -1,65 +1,42 @@
-# 当前技术结构
-
-仓库维护一个正式 App 实现。当前开发基线为 `0.2.0-beta.1-dev / Build 33`；公开 Build 17 的功能和验收范围与开发版分开记录，见[兼容性矩阵](compatibility-matrix.md)。构建入口见[贡献指南](../CONTRIBUTING.md)。
-
-## 输入与执行链
+# 当前架构
 
 `SwiftUI → AppViewModel / ConfigStore → CGEventTap → InputMailbox → GestureEngine → GestureCore / 触发协调器 → 动作执行器或 SystemGestureBridge`
 
-- `GestureMachine`负责死区、锁轴、横向进度、速度和结束；`VerticalGestureTracker`负责纵向进度与单次动作锁定。输入边沿/相邻移动进入有界队列，串行引擎按约 120Hz 生成连续帧。
-- `SystemGestureBridge`集中原生连续手势的私有接口。它接收绝对 progress、velocity 和 phase，不识别鼠标按钮或重算阈值；详细契约与来源见[桥接来源记录](system-gesture-provenance.md)。
-- `IOHIDManager`是可选非独占鼠标观察路径，用于设备事件与兼容诊断；主要手势输入来自 CGEventTap。
-- 服务停止、Escape、权限丢失、tap 中断、设备移除及休眠/会话变化走既有取消清理路径。输入恢复有次数上限，并尊重用户停用和挂起意图。
+## 模块职责
 
-## 映射与持久化
-
-`MouseInput.button(number)`保存一基用户编号；`MouseButtonIdentifier`是原始 CG 编号与 UI 名称的转换边界。CG raw 2…31 对应中键至鼠标按钮 32，左/右主键 0/1 禁止有效映射。映射全局生效，没有按应用或设备的 Profile。
-
-`MouseMapping`保存 UUID、input、trigger、action、isEnabled。`MouseMappingStore`用 Input+Trigger（包含修饰键）保证唯一条目；禁用条目仍占用唯一键。UI 主线程编辑值快照，引擎串行队列解析不可变快照，一次输入最多选中一个动作。
-
-`ConfigStore`在本地 UserDefaults 的 `gesture.configuration.v1` 字典中原子保存手势字段和 `mouseMappingsV1` JSON Data：
-
-| 文档版本 | 表达能力 |
+| 模块 | 职责 |
 |---|---|
-| v1 | 普通短按与拖动 |
-| v2 | 修饰键组合 |
-| v3 | 长按 |
-| v4 | 按住按钮并滚动 |
+| SwiftUI / AppViewModel | 三列映射界面、编辑草稿、权限状态、首次设置及菜单栏操作。 |
+| ConfigStore / MouseMappingStore | 本地配置、映射唯一性、持久化和不可变运行快照。 |
+| MouseInput / InputMailbox | 捕获按钮、移动及滚轮，保留输入边沿并合并相邻移动；IOHIDManager 提供可选非独占设备观察。 |
+| MouseInputRecorder | 暂停普通服务，录制按钮与修饰键；共享释放隔离，取消后仍消费已截获按钮的松开事件。 |
+| GestureEngine / GestureCore | 串行调度约 120 Hz 连续帧；GestureMachine 处理死区、锁轴、横向进度和速度，VerticalGestureTracker 处理纵向动作。 |
+| LongPressCoordinator | 按压归属、长按计时及 Short/Long/Drag/Wheel 仲裁；修饰键和动作在按钮按下时冻结。 |
+| MouseButtonActionExecutor | 分发系统、窗口、导航、媒体和键盘动作；具体执行器负责能力检查、焦点复查与取消。 |
+| SystemGestureBridge | 原生连续系统手势的非公开接口边界，接收 progress、velocity 和 phase；见[接口与来源](system-gesture-provenance.md)。 |
 
-写入采用配置所需的最低版本，新 reader 兼容 v1–v4。有效空文档代表用户已删除映射，不重新导入旧动作；损坏或未来文档停止解析，不回退旧短按。未知动作安全降为无操作，未知触发方式不能冒充短按。后续保存不是未来格式无损编辑的承诺。
+## 配置与匹配
 
-旧侧键动作通过兼容访问器和降级字段保留，不是第二套配置状态。首次实际编辑拖动映射时才设置 `dragMappingsManaged`；只打开界面不批量迁移。 `LegacyDragSettingsAdapter`把启用方向投影为原引擎按钮/轴配置；`LegacyDragDelivery`在原机器 began 时决定是否投递整个序列，保持开始与终止配对，反向仍属于同一次手势。拖动动作固定，修饰键拖动不支持。
+鼠标输入保存一基用户编号，CG raw 2…31 对应中键至鼠标按钮 32；左、右主键禁止有效映射。映射全局生效。`MouseMapping` 包含 UUID、input、trigger、action、isEnabled；Input+Trigger（含修饰键）唯一，禁用条目仍占用唯一键。
 
-## 录制与触发仲裁
+`ConfigStore` 在 UserDefaults 的 `gesture.configuration.v1` 字典中保存手势字段及 `mouseMappingsV1` JSON Data。格式支持 v1 基础映射、v2 修饰键、v3 长按、v4 滚轮，写入采用配置所需的最低版本。有效空文档不重新导入旧动作；损坏或未来文档停止解析，未知动作降为无操作。
 
-鼠标录制暂时暂停普通服务，只捕获一个合法按钮 down 及当时修饰键。录制层与普通 mailbox 共享释放隔离；已吞掉 down 的 up 在取消、Escape 或关闭弹窗后仍被消费，避免落入现有映射。录制结果先进入草稿，外层保存才写配置。失焦、挂起、撤权和退出结束录制。
+Short/Long 优先精确修饰键组合，缺少精确条目时才回退普通项；禁用或无操作的精确条目阻止回退。Wheel 只匹配完整组合，不回退普通项。`LegacyDragSettingsAdapter` 将映射投影为引擎按钮/轴配置；`LegacyDragDelivery` 在 began 时决定整段序列是否投递，保持终止配对。拖动动作固定，修饰键拖动不支持。
 
-修饰键在物理 down 冻结，不受之后松开/增加键影响。Short/Long 优先精确组合，不存在精确条目时才回退普通项；精确条目禁用或无操作时不回退，也不匹配修饰键子集。Wheel 仅匹配完整冻结组合，没有普通项回退。
+## 输入生命周期
 
-`LongPressCoordinator`维护每次按压的 pending/drag/longPress/wheel/cancelled 归属：
+短按提前松开立即执行；越过拖动阈值后不能恢复点击资格。长按默认 500 ms 执行一次，generation 隔离旧回调，到期释放补偿尚未派发的计时器。Drag、Long 或 Wheel 获得归属后，释放不再执行短按；其他仍按下的按钮可以继续驱动拖动。
 
-- 短按提前松开立即执行，不新增 500ms 等待；越过原拖动阈值后粘性取消，回起点不能恢复点击。
-- 长按默认 500ms 执行一次，generation 隔离旧回调。释放已到 deadline 而 timer 尚未派发时补偿一次长按；取消不恢复短按。拖动先识别取消长按，长按先执行将该按钮退出拖动驱动集合。
-- Wheel 首次产生有效 logical step 后锁定归属，释放不再触发短/长按。其他仍按下的按钮可以继续驱动拖动。无 owner 时选择最近按下的 eligible 按钮，首次成功后固定 owner，直到该按钮释放。
+滚轮通过 NSEvent 的 `isDirectionInvertedFromDevice` 还原物理方向。离散输入按 lines 累计，连续输入默认 10 points 一步；间隔至少 40 ms，闲置 250 ms 清残量，每个事件最多一步，不排队补发。`WheelInputHandoff` 在引擎队列排空先前输入并决定消费，8 ms 超时撤销并透传，不能迟到执行。
 
-滚轮唯一方向转换使用 NSEvent 的 `isDirectionInvertedFromDevice` 还原物理上下，不另读全局偏好。离散输入按 lines 累计，连续输入默认 10points 一步；最小间隔 40ms，闲置 250ms 清残量。每个原始事件最多执行一步，过大/过快的完整步直接丢弃，不排队补发；方向/单位切换清残量，momentum 不建立新归属或重复动作。
+停止、Escape、权限丢失、tap 中断、设备移除及休眠/会话变化取消待定动作并释放输入。恢复有次数上限，尊重用户停用与挂起意图。
 
-`WheelInputHandoff`先在同一引擎队列排空既有输入，再决定消费；预算 8ms，超时撤销并透传，不能迟到执行。已命中 wheel 的垂直事件整体消费；纯水平/无有效方向透传，混合事件不拆分重发。
+## 动作与运行状态
 
-## 动作与界面
+调度中心/应用 Exposé 短按复用纵向后端发送渐进单次序列。最小化使用 AX 窗口属性；全屏使用目标暴露的运行时属性或全屏按钮。返回发送带进程标记的配对侧键事件，监听入口放行自己的合成事件以防递归。打开访达使用 NSWorkspace；新建文件夹只向前台 Finder 进程发送命令。键盘及媒体动作由系统和目标应用处理。
 
-- 调度中心/应用 Exposé短按复用纵向后端，在约 0.2 秒/120Hz 发送渐进 one-shot；新物理输入优先，异步动作互斥并可取消。
-- 最小化通过公开 AX focused/main window、可写 AXMinimized 及执行前焦点重查。全屏先用目标明确暴露的运行时 AXFullScreen 属性，否则用公开全屏按钮/AXPress；不在失败后重试另一后端或键盘 fallback。
-- 返回发送带进程标记的 button3 down/up；监听入口只放行本进程合成事件，防递归。兼容性目前限于已验证 Chrome。
-- 显示桌面使用系统快捷键，缺省 F11 保留 secondaryFn 标记；快捷键和媒体动作依赖系统/目标应用。
-- 打开访达显示个人主目录；新建文件夹只向前台 Finder PID 发送原生命令，在当前目录创建并命名。锁屏复用系统快捷键。这些新增动作的真机状态见兼容矩阵。
+添加、编辑弹窗保存草稿后写配置，取消不写；主表动作选择直接保存。四方向只作展示分组，参数重置不覆盖映射；整组方向恢复和删除撤销保存在当前会话。
 
-主表三列为“鼠标输入 / 操作方式 / 执行动作”。普通动作选择直接保存；添加/编辑使用草稿，取消不写。四方向仅作展示分组，不合并底层记录；参数恢复不覆盖映射。整组停用的方向恢复和删除撤销只保存在当前会话，重启后需明确选择方向。帮助、权限、运行状态、关于位于次级设置入口。
+Bundle ID 为 `io.github.double-u-zw.macmousegesture`。`ProductIdentity` 仅导入旧偏好域的允许字段缺失值，保留已有值。`SingleInstance` 在初始化引擎前持有 `~/Library/Application Support/local.macmousegesture.poc/instance.lock` 的 flock；进程结束释放，运行中不得删除或迁移锁文件。登录启动由 `SMAppService.mainApp` 状态驱动。
 
-## 产品身份与诊断
-
-永久 Bundle ID 为 `io.github.double-u-zw.macmousegesture`。旧域 `local.macmousegesture.poc` 只导入八个实际手势字段和 onboardingCompleted 的缺失值；新值优先，旧域保留，迁移标记最后写入。
-
-单实例继续使用 `~/Library/Application Support/local.macmousegesture.poc/instance.lock` 作为有意保留的兼容命名空间。先持 flock 再初始化模型/引擎，进程结束由内核释放；运行中不得 unlink 或迁移 inode。登录启动由 SMAppService.mainApp 状态驱动，不是偏好键；旧版升级需 old-off/new-on。
-
-日志最多 300 行，集中脱敏；UI、复制和导出使用同一报告。动作诊断记录应用标识、阶段和结果，不记录窗口标题/URL/文档内容。API 接受请求或提交完成不等于系统动画成功；测试回读与实际鼠标验收必须分别记录。见[隐私说明](../PRIVACY.md)。
+诊断使用最多 300 行的脱敏内存日志，UI、复制与导出共用报告。API 接受请求或事件提交成功没有目标应用响应确认。

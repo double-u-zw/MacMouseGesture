@@ -1,9 +1,9 @@
 #!/bin/zsh
-# Run only after the user approves the scope described in docs/signing.md.
+# Run only after the user approves the scope described in README.md's development section.
 set -euo pipefail
 cd "${0:A:h:h}"
 if [[ "${1:-}" != "--approved" ]]; then
-  print -u2 'Read docs/signing.md first. This creates a project keychain and adds user-level trust for one code-signing certificate. Then run with --approved.'
+  print -u2 'Read the development section in README.md first. This creates a project keychain and adds user-level trust for one code-signing certificate. Then run with --approved.'
   exit 64
 fi
 umask 077

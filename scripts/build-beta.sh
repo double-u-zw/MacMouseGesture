@@ -36,7 +36,23 @@ python3 scripts/test-beta-package.py "$bundle"
 mkdir -p "$work/image" "$work/result/developer"
 cp -R "$bundle" "$work/image/MacMouseGesture.app"
 ln -s /Applications "$work/image/Applications"
-cp docs/INSTALL.md "$work/image/安装说明.md"
+# The standalone DMG instructions link back to their matching source revision.
+python3 - "$commit" "$work/image/安装说明.md" <<'PY'
+import re
+import sys
+from pathlib import Path
+from urllib.parse import urlsplit
+
+base = f"https://github.com/double-u-zw/MacMouseGesture/blob/{sys.argv[1]}/"
+def source_link(match):
+    target = match.group(2)
+    return match.group(1) + (target if urlsplit(target).scheme else base + target) + match.group(3)
+
+readme = re.sub(r'(\[[^\]]*\]\()([^\n)]*)(\))', source_link, Path('README.md').read_text(encoding='utf-8'))
+readme = readme.replace('src="design/app-icon-source.png"',
+    f'src="https://raw.githubusercontent.com/double-u-zw/MacMouseGesture/{sys.argv[1]}/design/app-icon-source.png"')
+Path(sys.argv[2]).write_text(readme, encoding='utf-8')
+PY
 hdiutil create -quiet -volname 'MacMouseGesture Beta Preview' -srcfolder "$work/image" \
   -format UDZO "$work/result/MacMouseGesture-$version.dmg"
 hdiutil verify "$work/result/MacMouseGesture-$version.dmg"

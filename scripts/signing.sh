@@ -3,7 +3,7 @@
 prepare_signing() {
   signing_dir="$PWD/.local-signing"
   if [[ ! -f "$signing_dir/identity.sha1" ]]; then
-    print -u2 'No pinned signing identity. See docs/signing.md; configure a stable certificate before building.'
+    print -u2 'No pinned signing identity. See the development section in README.md; configure a stable certificate before building.'
     return 1
   fi
   signing_identity="$(< "$signing_dir/identity.sha1")"
