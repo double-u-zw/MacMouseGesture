@@ -3,7 +3,8 @@
 set -euo pipefail
 cd "${0:A:h:h}"
 root="$PWD"
-version=0.2.0-beta.1
+version="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleShortVersionString' Resources/Info.plist)"
+build_number="$(/usr/libexec/PlistBuddy -c 'Print :CFBundleVersion' Resources/Info.plist)"
 commit="$(git rev-parse HEAD)"
 [[ -z "$(git status --porcelain --untracked-files=normal)" ]] || { print -u2 'Commit reviewed source before building a traceable Preview.'; exit 1; }
 mkdir -p build
@@ -51,9 +52,9 @@ cp "$work/tests.txt" "$work/probe.txt" "$work/result/developer/"
 xcrun dwarfdump --uuid "$bundle/Contents/MacOS/MacMouseGesture" > "$work/result/developer/executable-uuid.txt"
 xcrun dwarfdump --uuid "$work/build/MacMouseGesture.app.dSYM" > "$work/result/developer/dsym-uuid.txt"
 [[ "$(cut -d ' ' -f 2 "$work/result/developer/executable-uuid.txt")" == "$(cut -d ' ' -f 2 "$work/result/developer/dsym-uuid.txt")" ]]
-print -r -- "version=$version build=17 commit=$commit signing=local-self-signed hardened-runtime=true" > "$work/result/developer/build.txt"
+print -r -- "version=$version build=$build_number commit=$commit signing=local-self-signed hardened-runtime=true" > "$work/result/developer/build.txt"
 (cd "$work/result" && shasum -a 256 "MacMouseGesture-$version.dmg" > SHA256SUMS && shasum -a 256 -c SHA256SUMS)
-output="$root/build/beta-preview/$version-build17-$commit"
+output="$root/build/beta-preview/$version-build$build_number-$commit"
 [[ ! -e "$output" ]] || { print -u2 'Archive already exists; refusing to overwrite.'; exit 1; }
 mkdir -p "${output:h}"
 mv "$work/result" "$output"

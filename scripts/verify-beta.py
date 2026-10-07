@@ -6,9 +6,13 @@ def verify(bundle):
     bundle = pathlib.Path(bundle)
     with (bundle / 'Contents/Info.plist').open('rb') as f:
         p = plistlib.load(f)
+    source_plist = pathlib.Path(__file__).resolve().parent.parent / 'Resources/Info.plist'
+    source = plistlib.loads(source_plist.read_bytes())
     expected = dict(CFBundleIdentifier='io.github.double-u-zw.macmousegesture', CFBundleExecutable='MacMouseGesture',
-                    CFBundleName='MacMouseGesture', CFBundleIconFile='MacMouseGesture', CFBundleShortVersionString='0.2.0-beta.1', CFBundleVersion='17',
-                    BetaVersion='0.2.0-beta.1', CFBundlePackageType='APPL', LSMinimumSystemVersion='27.0', LSUIElement=True)
+                    CFBundleName='MacMouseGesture', CFBundleIconFile='MacMouseGesture',
+                    CFBundlePackageType='APPL', LSMinimumSystemVersion='27.0', LSUIElement=True)
+    for key in ['CFBundleShortVersionString', 'CFBundleVersion', 'BetaVersion']:
+        expected[key] = source[key]
     for key, value in expected.items():
         assert p.get(key) == value, f'invalid {key}'
     assert re.fullmatch(r'[0-9a-f]{40}', p.get('GitCommit', '')), 'missing commit'

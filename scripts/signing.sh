@@ -1,5 +1,5 @@
 #!/bin/zsh
-# Sourced by build.sh and the update experiment. No implicit ad-hoc fallback.
+# Sourced by local and Preview builds. No implicit ad-hoc fallback.
 prepare_signing() {
   signing_dir="$PWD/.local-signing"
   if [[ ! -f "$signing_dir/identity.sha1" ]]; then

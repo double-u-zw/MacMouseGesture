@@ -1,11 +1,33 @@
 #!/bin/zsh
 set -euo pipefail
 cd "${0:A:h:h}"
-source scripts/toolchain.sh
-if [[ "${1:-}" != "--locked" ]]; then
-  xcrun clang scripts/BuildGuard.c -o build/BuildGuard
-  exec build/BuildGuard "$PWD/build/poc.lock" /bin/zsh "$PWD/scripts/build.sh" --locked
+dev_mode=false
+locked=false
+for option in "$@"; do
+  case "$option" in
+    --dev) dev_mode=true ;;
+    --locked) locked=true ;;
+    *) print -u2 "Unknown build option: $option"; exit 64 ;;
+  esac
+done
+output="$PWD/build"
+mode_args=()
+if $dev_mode; then
+  output="$PWD/build/dev"
+  mode_args=(--dev)
 fi
+bundle="$output/MacMouseGesture.app"
+mkdir -p "$output"
+if ! $locked; then
+  guard="$(mktemp "$PWD/build/.BuildGuard.XXXXXX")"
+  trap 'rm -f "$guard"' EXIT
+  xcrun clang scripts/BuildGuard.c -o "$guard"
+  mv -f "$guard" build/BuildGuard
+  trap - EXIT
+  exec build/BuildGuard "$PWD/build/build.lock" --bundle "$bundle" \
+    /bin/zsh "$PWD/scripts/build.sh" --locked "${mode_args[@]}"
+fi
+source scripts/toolchain.sh
 source scripts/signing.sh
 prepare_signing
 # Identity fields cannot drift when only the version is meant to change.
@@ -13,26 +35,32 @@ prepare_signing
 [[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleExecutable' Resources/Info.plist)" == MacMouseGesture ]]
 [[ "$(/usr/libexec/PlistBuddy -c 'Print :CFBundleName' Resources/Info.plist)" == 'MacMouseGesture' ]]
 compile_core
-xcrun swiftc "${swift_flags[@]}" -I build/modules -I Sources/SystemGestureBridge/include \
-  Sources/MouseGesturePOC/*.swift build/GestureCore.o build/SystemGestureBridge.o \
-  -framework AppKit -framework IOKit -framework Foundation -framework CoreGraphics -framework ServiceManagement -o build/MacMouseGesture
-bundle="$PWD/build/MacMouseGesture.app"
-stage="$(mktemp -d "$PWD/build/package.XXXXXX")"
+stage="$(mktemp -d "$output/.package.XXXXXX")"
+cleanup() {
+  if [[ -d "$stage/previous.app" && ! -e "$bundle" ]]; then
+    mv "$stage/previous.app" "$bundle"
+  fi
+  rm -rf "$stage"
+}
+trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
 staged_bundle="$stage/MacMouseGesture.app"
 mkdir -p "$staged_bundle/Contents/MacOS" "$staged_bundle/Contents/Resources"
-cp build/MacMouseGesture "$staged_bundle/Contents/MacOS/MacMouseGesture"
+xcrun swiftc "${swift_flags[@]}" -I build/modules -I Sources/SystemGestureBridge/include \
+  Sources/MouseGesturePOC/*.swift build/GestureCore.o build/SystemGestureBridge.o \
+  -framework AppKit -framework IOKit -framework Foundation -framework CoreGraphics -framework ServiceManagement \
+  -o "$staged_bundle/Contents/MacOS/MacMouseGesture"
 cp Resources/Info.plist "$staged_bundle/Contents/Info.plist"
 cp Resources/MacMouseGesture.icns "$staged_bundle/Contents/Resources/"
 cp THIRD_PARTY_NOTICES.md "$staged_bundle/Contents/Resources/"
 sign_bundle "$staged_bundle"
-# Keep the previously installed bundle recoverable, even if a later build fails.
+# Recheck after compilation. Keep rollback material only until replacement succeeds.
+build/BuildGuard --check-bundle "$bundle"
 if [[ -e "$bundle" ]]; then
-  previous="$(mktemp -d "$PWD/build/previous.XXXXXX")"
-  mv "$bundle" "$previous/MacMouseGesture.app"
+  mv "$bundle" "$stage/previous.app"
 fi
 if ! mv "$staged_bundle" "$bundle"; then
-  [[ -z "${previous:-}" ]] || mv "$previous/MacMouseGesture.app" "$bundle"
   exit 1
 fi
-rmdir "$stage"
 print -r -- "Built: $bundle"

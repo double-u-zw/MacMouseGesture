@@ -50,5 +50,5 @@ for raw in git('ls-files', '-z', '--cached', '--others', '--exclude-standard').s
     if file.is_file(): inspect(file.read_bytes(), 'working:' + path, path)
 print(json.dumps(dict(reachableObjects=len(seen), findings=findings,
     limitations='Pattern scan only; commit emails need owner decision; source licensing requires manual review.'), indent=2))
-# Privacy/license findings keep PUBLIC_REPOSITORY_AUDIT pending.
+# Findings require review; this scanner does not publish anything.
 raise SystemExit(1 if findings else 0)

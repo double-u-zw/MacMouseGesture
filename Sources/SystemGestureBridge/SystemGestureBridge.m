@@ -1,4 +1,4 @@
-// Written for MacMouseGesture from docs/system-gesture-bridge-spec.md and the
+// Written for MacMouseGesture from docs/system-gesture-provenance.md and the
 // project's C-API behavior contracts. No Mac Mouse Fix source was copied into
 // this replacement. Earlier research/history is acknowledged in the notices.
 // This implementation still relies on undocumented/private macOS interfaces.

@@ -19,18 +19,6 @@ xcuserdata/
 .env
 .env.*
 
-# Third-party research checkouts are local references, not project source.
-references/
-
-# Keep only small, reviewed baseline manifests and test summaries in Git.
-baselines/**/*
-!baselines/**/
-!baselines/README.md
-!baselines/**/README.md
-!baselines/**/SHA256SUMS
-!baselines/**/test-output.txt
-!baselines/**/tests-rechecked.txt
-
 # Distribution products and user-exported diagnostics (never source assets).
 *.app/
 *.dSYM/

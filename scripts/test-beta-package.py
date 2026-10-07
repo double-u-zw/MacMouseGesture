@@ -11,8 +11,8 @@ with tempfile.TemporaryDirectory() as temp:
         plist = target / 'Contents/Info.plist'
         if mutation in ['version', 'marketing', 'identity', 'commit', 'dirty']:
             p = plistlib.loads(plist.read_bytes())
-            if mutation == 'version': p['CFBundleVersion'] = '12'
-            if mutation == 'marketing': p['CFBundleShortVersionString'] = '0.2.0'
+            if mutation == 'version': p['CFBundleVersion'] += '-invalid'
+            if mutation == 'marketing': p['CFBundleShortVersionString'] += '-invalid'
             if mutation == 'identity': p['CFBundleIdentifier'] = 'local.macmousegesture.poc'  # legacy rejection fixture
             if mutation == 'commit': p.pop('GitCommit')
             if mutation == 'dirty': p['SourceTreeDirty'] = True

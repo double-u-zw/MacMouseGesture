@@ -1,23 +1,29 @@
 # 隐私说明
 
-适用于 0.2.0-beta.1，依据当前源码核对，不包含未来计划中的功能。
+适用于当前 `0.2.0-beta.1-dev / Build 33` 源码。
 
-- 无需账户，不访问 Apple ID，无云同步。
-- 没有网络上传、analytics、crash upload、telemetry 或自动日志上传。
-- 设置通过 UserDefaults 保存在本机。用户级运行锁保存在用户资源库 Application Support 中。
-- 运行中会生成最多 300 行的内存日志，以及鼠标事件/手势/性能计数；退出后内存日志消失。并非点击导出后才生成日志。
-- 仅当用户主动点击“复制诊断信息”或“保存诊断快照”才导出报告；保存路径由用户选择。报告和错误消息经过集中脱敏，安装位置只显示 Applications / 非 Applications。自由文本中包含绝对路径的行会保守删去路径及后续内容。
-- 报告可能含版本、Build、Git Commit、macOS、架构、权限状态、设置、侧键/拖动/手势计数、性能数据、HID 鼠标 vendor/product 数字编号及错误状态。编号不是序列号。
-- “高级诊断”可预览即将导出的内容；请在提交 Issue 前检查，按需删去不希望分享的内容。
+无需账户，不访问 Apple ID，无云同步、遥测、自动崩溃上传或诊断上传。点击项目链接会交由浏览器打开；应用没有后台网络上传实现。
 
-## Not collected
+## 输入处理
 
-窗口标题、窗口内容、网页 URL/网页内容、用户文档或私人文件名、剪贴板内容、Apple ID、鼠标序列号：**Not collected**。程序只读写自身设置/资源与用户主动保存的诊断文件，不扫描用户文件。
+- 服务运行时通过 CGEventTap 接收鼠标按钮、移动、拖动与滚轮事件，读取按钮编号、位移和修饰键状态，用于匹配映射与识别手势。返回动作会临时读取指针位置，用于在原位置生成鼠标事件。
+- 手势模式的事件监听也包含 `keyDown`。持有配置按钮期间，只检查 Escape 的键码以取消当前动作，不读取文字、不保存普通键盘输入历史，键盘事件继续传递。
+- 用户主动录制鼠标输入时，应用捕获按钮及 ⌘ / ⌥ / ⌃ / ⇧ 状态；录制期间暂停普通服务。左、右键不作为可重映射输入。
+- 用户主动录制自定义快捷键时，当前录制窗口的本地键盘监听会捕获键码和修饰键。只有保存映射后才将该快捷键写入本机配置，不记录输入正文。
+- 源码中的可选 IOHID 鼠标观察路径只匹配鼠标，记录按钮、位移计数及 vendor/product 数字编号，不读取设备序列号、不独占设备。
 
-键盘输入内容：**Not collected / not recorded**。但手势运行时的事件监听包含 keyDown；按住配置侧键期间，仅检查 Escape 的键码以取消手势，不转换文字、不保存键码、始终传递键盘输入。不能把这一点描述为“完全不接触键盘事件”。
+执行窗口、应用 Exposé 和访达动作时，应用会读取前台应用标识或 PID，以及所需的窗口存在、最小化、全屏等状态。它不读取窗口标题、窗口正文、网页 URL 或网页内容、用户文档正文、现有剪贴板内容，也不扫描用户文件目录。打开访达与新建文件夹按用户配置的动作交给系统或访达执行。
 
-剪贴板只在用户点击复制诊断时写入，不读取已有内容。系统可能独立生成 macOS 崩溃报告，本应用没有自动收集或上传机制。
+## 本机存储与诊断
+
+映射、录制后保存的快捷键、手势设置及首次设置状态通过 UserDefaults 保存在本机。单实例锁位于用户资源库的 Application Support 中。
+
+运行时生成最多 300 行的内存日志，以及输入、手势和性能计数；退出后内存日志消失。诊断可能包含版本、Build、Git Commit、macOS、架构、权限、配置参数、鼠标按钮编号、位移或手势进度、执行动作与错误、系统动作的快捷键码和修饰键、前台应用 bundle ID 或 PID、窗口状态，以及可选 HID 鼠标 vendor/product 编号。应用标识与 PID 不会被路径脱敏规则移除。
+
+日志入口与报告出口集中脱敏绝对文件路径；安装位置显示为 Applications / 非 Applications。该处理不意味着报告中的所有技术信息都已匿名化。
+
+只有主动点击“复制诊断信息”或“保存诊断快照”才会将报告写入剪贴板或用户选择的文件；应用不读取剪贴板原有内容。“高级诊断”可预览报告，分享前请检查并按需删去不希望公开的信息。macOS 可能独立生成系统崩溃报告，应用没有自动收集或上传机制。
 
 ## 源码依据
 
-`Diagnostics.swift`（有界日志）、`DiagnosticRedactor.swift`（脱敏）、`main.swift`（报告/导出）、`MouseInput.swift`（鼠标计数与 Escape）、`HIDInputBackend.swift`（鼠标匹配与 vendor/product）、`AppConfig.swift`（设置）、`SingleInstance.swift`（用户级锁）。没有新增远程服务。
+输入与录制见 `MouseInput.swift`、`MouseInputRecorderService.swift`、`ShortcutRecorderView.swift`、`HIDInputBackend.swift`；动作所需应用与窗口状态见各 `*Action.swift`；存储与诊断见 `AppConfig.swift`、`SingleInstance.swift`、`Diagnostics.swift`、`DiagnosticRedactor.swift` 和 `main.swift`。这些文件位于 `Sources/MouseGesturePOC/`。
